@@ -27,3 +27,7 @@ vite.config.*.timestamp-*
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel CLI link and build output
+.vercel
+.env*

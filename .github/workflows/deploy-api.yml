@@ -1,0 +1,61 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yaml"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+# One deploy at a time on the VPS: two parallel image builds do not fit in 4 GB RAM
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BRANCH: ${{ github.ref_name }}
+      # main → ~/rehab-cdss (prod), dev → ~/rehab-cdss-dev
+      REPO_DIR: ${{ github.ref_name == 'main' && 'rehab-cdss' || 'rehab-cdss-dev' }}
+    steps:
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Pull, build and restart
+        run: |
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "REPO_DIR=$REPO_DIR BRANCH=$BRANCH bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$HOME/$REPO_DIR"
+
+          # .env and data/ are git-ignored, so the reset does not touch them
+          git fetch --quiet origin "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+          echo "Deploying $(git log --oneline -1) to ~/$REPO_DIR"
+
+          docker compose up -d --build --remove-orphans
+          docker image prune -f
+
+          container=$(docker compose ps -q api)
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$container")
+            echo "health: $status"
+            [ "$status" = healthy ] && exit 0
+            sleep 5
+          done
+          docker compose logs --tail 50 api
+          exit 1
+          EOF

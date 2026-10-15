@@ -1,0 +1,8 @@
+# Only pyproject.toml, uv.lock, README.md and src/ are needed in the build context
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+src/**/__pycache__
+src/*.egg-info

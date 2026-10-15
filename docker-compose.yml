@@ -1,0 +1,18 @@
+# One copy of the repo per environment (e.g. ~/dev/rehab-cdss, ~/prod/rehab-cdss).
+# Set COMPOSE_PROJECT_NAME and HOST_PORT in each copy's .env so the stacks do not collide.
+services:
+  api:
+    build: .
+    image: ${COMPOSE_PROJECT_NAME:-rehab-cdss}-api
+    env_file: .env
+    ports:
+      # Localhost only: the host's Caddy proxies public traffic to this port
+      - "127.0.0.1:${HOST_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

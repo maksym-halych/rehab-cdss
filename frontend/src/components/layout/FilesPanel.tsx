@@ -3,8 +3,14 @@ import { Trash2 } from 'lucide-react';
 import { FileListScroller } from '../files/FileListScroller';
 import { FileUploadTrigger } from '../files/FileUploadTrigger';
 import { PersonSelector } from '../files/PersonSelector';
+import { JsonPreview } from '../files/JsonPreview';
 import { Button } from '../ui/Button';
-import type { DetectFilesResponse, ConfigResponse, UploadedFile } from '../../api/types';
+import type {
+  DetectFilesResponse,
+  ConfigResponse,
+  Module1JsonPreview,
+  UploadedFile,
+} from '../../api/types';
 import styles from './FilesPanel.module.css';
 
 interface FilesPanelProps {
@@ -24,6 +30,8 @@ interface FilesPanelProps {
   hasFiles: boolean;
   totalFiles: number;
   recognizedFiles: number;
+  jsonPreview: Module1JsonPreview | null;
+  error: string | null;
 }
 
 export const FilesPanel: React.FC<FilesPanelProps> = ({
@@ -43,6 +51,8 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
   hasFiles,
   totalFiles,
   recognizedFiles,
+  jsonPreview,
+  error,
 }) => {
   const multiplePeople = detectedPeople.length > 1;
   return (
@@ -58,7 +68,9 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <h2 className={styles.title}>Файли</h2>
-          {hasFiles && (
+          {jsonPreview ? (
+            <span className={styles.stats}>JSON Модуля 1</span>
+          ) : hasFiles && (
             <span className={styles.stats}>
               {recognizedFiles} / {totalFiles} розпізнано
             </span>
@@ -90,6 +102,15 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
         </div>
       )}
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
+      {jsonPreview ? (
+        <JsonPreview preview={jsonPreview} onRemove={onClear} />
+      ) : (
       <FileListScroller
         detectedPeople={detectedPeople}
         fileGroups={fileGroups}
@@ -103,6 +124,7 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
         config={config}
         hasFiles={hasFiles}
       />
+      )}
     </section>
   );
 };

@@ -95,6 +95,21 @@ export interface PatientParams {
   activityLevel: 'elite' | 'recreational' | 'low';
 }
 
+/** Client-side summary of an uploaded Module 1 JSON export (demo mode). */
+export interface Module1JsonPreview {
+  fileName: string;
+  patientInfo: {
+    name?: string;
+    patient_code?: string;
+    age?: number;
+    gender?: string;
+    activity_level?: string;
+  };
+  synthetic: boolean;
+  scenario: string | null;
+  tests: Array<{ name: string; rows: number; outOfNorm: number; hasText: boolean }>;
+}
+
 export interface UploadedFile {
   clientId: string;
   file: File;

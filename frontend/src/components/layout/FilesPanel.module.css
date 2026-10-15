@@ -59,3 +59,12 @@
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
+
+.error {
+  margin: var(--space-3) var(--space-5) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--danger-100);
+  color: var(--danger-700);
+  font-size: var(--text-sm);
+}

@@ -1,0 +1,133 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+  max-height: var(--file-list-max-height, calc(100vh - 240px));
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fileIcon {
+  color: var(--primary-500);
+  flex-shrink: 0;
+}
+
+.fileName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.badge {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-full);
+  background-color: var(--primary-100);
+  color: var(--primary-700);
+  font-weight: var(--font-weight-medium);
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.removeBtn:hover {
+  color: var(--danger-500);
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.patient {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface-alt);
+}
+
+.patient dt {
+  color: var(--text-secondary);
+}
+
+.patient dd {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.testsHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.test {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.test:last-child {
+  border-bottom: none;
+}
+
+.testName {
+  color: var(--text-primary);
+}
+
+.countOk,
+.countBad,
+.countText {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-full);
+  font-variant-numeric: tabular-nums;
+}
+
+.countOk {
+  background-color: var(--success-100);
+  color: var(--success-700);
+}
+
+.countBad {
+  background-color: var(--danger-100);
+  color: var(--danger-700);
+}
+
+.countText {
+  background-color: var(--bg-surface-alt);
+  color: var(--text-secondary);
+}

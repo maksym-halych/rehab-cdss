@@ -11,8 +11,9 @@ from ..services.job_store import JobStore, _EXECUTOR
 REPORTS_ROOT = Path("data/reports")
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-LLM_MODEL = "gemini-3.1-pro-preview"
-LLM_FALLBACK_MODEL = "gemini-2.5-pro"
+# Override in .env, e.g. GEMINI_MODEL=gemini-3-flash-preview on the free tier (Pro has 0 free quota).
+LLM_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+LLM_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3-flash-preview")
 
 
 async def run_module2_async(
@@ -34,11 +35,14 @@ async def run_module2_async(
         )
         return
 
-    if not os.getenv("OPENAI_API_KEY"):
+    from module_2_reasoning.embeddings import embedding_key_env
+
+    embed_key_env = embedding_key_env()
+    if not os.getenv(embed_key_env):
         await job_store.update(
             job_id,
             module2_status=Module2Status.FAILED,
-            module2_error="OPENAI_API_KEY environment variable is not set (required for exercise matching)",
+            module2_error=f"{embed_key_env} environment variable is not set (required for embeddings)",
         )
         return
 

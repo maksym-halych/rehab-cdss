@@ -34,8 +34,9 @@ from langchain_openai import ChatOpenAI  # noqa: E402
 from module_2_reasoning.graph import build_pipeline  # noqa: E402
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-LLM_MODEL = "gemini-3.1-pro-preview"
-LLM_FALLBACK_MODEL = "gemini-2.5-pro"
+# Override in .env, e.g. GEMINI_MODEL=gemini-3-flash-preview on the free tier (Pro has 0 free quota).
+LLM_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+LLM_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3-flash-preview")
 
 JSON_EXPORTS_DIR = _PROJECT_ROOT / "data" / "json_exports"
 OUTPUT_DIR = _PROJECT_ROOT / "data" / "module2_output"

@@ -9,7 +9,7 @@ on:
       - "uv.lock"
       - "Dockerfile"
       - ".dockerignore"
-      - "docker-compose.yml"
+      - "docker-compose.yaml"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
@@ -24,7 +24,8 @@ jobs:
     timeout-minutes: 20
     env:
       BRANCH: ${{ github.ref_name }}
-      TARGET: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+      # main → ~/rehab-cdss (prod), dev → ~/rehab-cdss-dev
+      REPO_DIR: ${{ github.ref_name == 'main' && 'rehab-cdss' || 'rehab-cdss-dev' }}
     steps:
       - name: Configure SSH
         run: |
@@ -36,14 +37,14 @@ jobs:
       - name: Pull, build and restart
         run: |
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "TARGET=$TARGET BRANCH=$BRANCH bash -s" <<'EOF'
+            "REPO_DIR=$REPO_DIR BRANCH=$BRANCH bash -s" <<'EOF'
           set -euo pipefail
-          cd "$HOME/$TARGET/rehab-cdss"
+          cd "$HOME/$REPO_DIR"
 
           # .env and data/ are git-ignored, so the reset does not touch them
           git fetch --quiet origin "$BRANCH"
           git reset --hard "origin/$BRANCH"
-          echo "Deploying $(git log --oneline -1) to $TARGET"
+          echo "Deploying $(git log --oneline -1) to ~/$REPO_DIR"
 
           docker compose up -d --build --remove-orphans
           docker image prune -f

@@ -44,6 +44,26 @@ export async function submitJob(params: {
   return res.json();
 }
 
+export async function submitJsonJob(params: {
+  file: File;
+  age: number | null;
+  gender: string | null;
+  activityLevel: string;
+  manualPersonName: string;
+  patientCode: string;
+}): Promise<{ job_id: string; status: string; status_url: string; created_at: string }> {
+  const fd = new FormData();
+  fd.append('file', params.file, params.file.name);
+  if (params.age !== null) fd.append('age', String(params.age));
+  if (params.gender) fd.append('gender', params.gender);
+  fd.append('activity_level', params.activityLevel);
+  fd.append('manual_person_name', params.manualPersonName);
+  fd.append('patient_code', params.patientCode);
+  const res = await fetch(`${BASE}/api/v1/jobs/from-json`, { method: 'POST', headers: headers(), body: fd });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function getJob(jobId: string): Promise<Job> {
   const res = await fetch(`${BASE}/api/v1/jobs/${jobId}`, { headers: headers() });
   if (!res.ok) throw new Error(await res.text());

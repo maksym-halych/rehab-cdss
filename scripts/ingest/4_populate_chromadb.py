@@ -11,12 +11,11 @@ Requires: OPENAI_API_KEY
 """
 
 import json
-import os
 import sys
 from pathlib import Path
 
 import chromadb
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from module_2_reasoning.embeddings import make_embedding_function
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
@@ -40,7 +39,6 @@ EXERCISES_DB_DIR = (
 )
 CHROMA_DIR = _PROJECT_ROOT / "data" / "chromadb"
 
-EMBED_MODEL = "text-embedding-3-small"
 UPSERT_BATCH_SIZE = 50
 
 
@@ -114,13 +112,9 @@ def populate_exercises(collection: chromadb.Collection) -> int:
 
 
 def main() -> None:
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
-    ef = OpenAIEmbeddingFunction(api_key=openai_key, model_name=EMBED_MODEL)
+    ef = make_embedding_function()
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
     protocols_col = client.get_or_create_collection(

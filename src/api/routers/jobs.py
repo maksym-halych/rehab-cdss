@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import asyncio
@@ -9,6 +10,7 @@ from ..dependencies import get_job_store, verify_api_key
 from ..services.file_service import save_uploads
 from ..models.jobs import Job, JobStatus, Module2Status
 from ..services.job_store import JobStore
+from ..services.module2_service import REPORTS_ROOT, run_module2_async
 from ..services.pipeline_service import run_pipeline_async
 
 router = APIRouter(dependencies=[Depends(verify_api_key)])
@@ -188,6 +190,102 @@ async def create_job(
             patient_code=patient_code or None,
             job_store=job_store,
         )
+    )
+
+    return JobCreatedResponse(
+        job_id=job.job_id,
+        status="pending",
+        status_url=f"/api/v1/jobs/{job.job_id}",
+        created_at=job.created_at.isoformat(),
+    )
+
+
+MAX_JSON_SIZE_BYTES = 5 * 1024 * 1024
+
+
+@router.post(
+    "/jobs/from-json",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobCreatedResponse,
+)
+async def create_job_from_json(
+    file: UploadFile = File(...),
+    age: Optional[int] = Form(default=None),
+    gender: Optional[str] = Form(default=None),
+    activity_level: Optional[str] = Form(default=None),
+    manual_person_name: str = Form(default=""),
+    patient_code: str = Form(default=""),
+    job_store: JobStore = Depends(get_job_store),
+) -> JobCreatedResponse:
+    """Run Module 2 directly on an uploaded Module 1 JSON export (skips Module 1).
+
+    Intended for testing and demos with synthetic exports
+    (scripts/demo/generate_module1_json.py). Non-empty form fields override
+    the matching ``patient_info`` values from the JSON.
+    """
+    raw = await file.read(MAX_JSON_SIZE_BYTES + 1)
+    if len(raw) > MAX_JSON_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={"code": "FILE_TOO_LARGE", "message": "JSON file is larger than 5 MB"},
+        )
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_JSON", "message": "File is not valid UTF-8 JSON"},
+        )
+    if not isinstance(data, dict) or not isinstance(data.get("test_results"), list):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_MODULE1_JSON",
+                "message": "JSON must be an object with a 'test_results' list",
+            },
+        )
+    if activity_level and activity_level not in ALLOWED_ACTIVITY_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_ACTIVITY_LEVEL",
+                "message": f"activity_level must be one of: {sorted(ALLOWED_ACTIVITY_LEVELS)}",
+            },
+        )
+    if age is not None and not (0 <= age <= 120):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_AGE", "message": "age must be between 0 and 120"},
+        )
+
+    patient_info = data.get("patient_info")
+    if not isinstance(patient_info, dict):
+        patient_info = {}
+    overrides = {
+        "age": age,
+        "gender": gender,
+        "activity_level": activity_level,
+        "name": manual_person_name,
+        "patient_code": patient_code,
+    }
+    patient_info.update({k: v for k, v in overrides.items() if v not in (None, "")})
+    data["patient_info"] = patient_info
+
+    job = await job_store.create()
+    job_dir = REPORTS_ROOT / job.job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    json_path = job_dir / "module1_export.json"
+    json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Module 1 is skipped: the job is "completed" as soon as the export is saved.
+    await job_store.update(
+        job.job_id,
+        status=JobStatus.COMPLETED,
+        completed_at=datetime.now(timezone.utc),
+        json_export_path=str(json_path),
+    )
+    asyncio.get_running_loop().create_task(
+        run_module2_async(job.job_id, str(json_path), job_store)
     )
 
     return JobCreatedResponse(

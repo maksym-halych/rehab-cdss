@@ -1,0 +1,129 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-primary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast), box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+  white-space: nowrap;
+  position: relative;
+  text-decoration: none;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sizes */
+.btn--sm {
+  height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  min-width: 32px;
+}
+
+.btn--md {
+  height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-base);
+  min-width: 40px;
+}
+
+.btn--lg {
+  height: 48px;
+  padding: 0 var(--space-6);
+  font-size: var(--text-md);
+  min-width: 48px;
+}
+
+/* Touch target enforcement */
+@media (pointer: coarse) {
+  .btn--sm,
+  .btn--md {
+    min-height: 44px;
+  }
+}
+
+/* Variants */
+.btn--primary {
+  background-color: var(--interactive-primary-bg);
+  color: var(--interactive-primary-text);
+  border-color: transparent;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: var(--interactive-primary-bg-hover);
+}
+
+.btn--secondary {
+  background-color: var(--interactive-secondary-bg);
+  color: var(--interactive-secondary-text);
+  border-color: var(--interactive-secondary-border);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background-color: var(--interactive-secondary-bg-hover);
+}
+
+.btn--ghost {
+  background-color: var(--interactive-ghost-bg);
+  color: var(--interactive-ghost-text);
+  border-color: transparent;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background-color: var(--interactive-ghost-bg-hover);
+  color: var(--text-primary);
+}
+
+.btn--danger {
+  background-color: var(--interactive-danger-bg);
+  color: var(--interactive-danger-text);
+  border-color: transparent;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: var(--interactive-danger-bg-hover);
+}
+
+/* Modifiers */
+.btn--full {
+  width: 100%;
+}
+
+.btn--icon {
+  padding: 0;
+  aspect-ratio: 1;
+}
+
+.btn--icon.btn--sm {
+  width: 32px;
+  height: 32px;
+}
+
+.btn--icon.btn--md {
+  width: 40px;
+  height: 40px;
+}
+
+.btn--icon.btn--lg {
+  width: 48px;
+  height: 48px;
+}
+
+.btn--loading {
+  cursor: wait;
+}

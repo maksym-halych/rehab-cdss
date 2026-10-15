@@ -1,0 +1,42 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+}
+
+.header {
+  height: var(--header-height);
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.tabBarWrap {
+  width: 100%;
+  background-color: var(--bg-surface);
+  flex-shrink: 0;
+  z-index: 9;
+}
+
+.tabBarInner {
+  display: flex;
+  justify-content: flex-start;
+  max-width: var(--content-max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--app-padding-x);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--app-padding-y) var(--app-padding-x);
+  max-width: var(--content-max-width);
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}

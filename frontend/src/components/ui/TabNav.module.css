@@ -1,0 +1,85 @@
+.tabNav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--tab-bar-height);
+  border-bottom: 1px solid var(--border-default);
+  padding: 0 var(--app-padding-x);
+  background-color: var(--bg-surface);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.tabActive {
+  color: var(--primary-700);
+  border-bottom-color: var(--primary-600);
+}
+
+.pulseBadge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-500);
+  margin-left: var(--space-2);
+  animation: pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.dotBadge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-500);
+  margin-left: var(--space-2);
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulseBadge {
+    animation: none;
+  }
+}
+
+@media print {
+  .tabNav {
+    display: none !important;
+  }
+}

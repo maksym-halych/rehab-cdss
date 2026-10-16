@@ -26,6 +26,8 @@ jobs:
       # main → Vercel Production, dev → Vercel Preview (VITE_* values come from the matching Vercel environment)
       VERCEL_ENV: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
       DEV_DOMAIN: rehab-cdss-dev.vercel.app
+      # alias does not read VERCEL_ORG_ID and falls back to the personal account without an explicit scope
+      VERCEL_SCOPE: maksymhalych-1559s-projects
     steps:
       - uses: actions/checkout@v4
 
@@ -49,5 +51,5 @@ jobs:
           else
             url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
             echo "Preview: $url"
-            vercel alias set "$url" "$DEV_DOMAIN" --token="$VERCEL_TOKEN"
+            vercel alias set "$url" "$DEV_DOMAIN" --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
           fi

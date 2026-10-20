@@ -1,17 +1,17 @@
 import json
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from module_2_reasoning.paths import DATA_DIR
 from pydantic import BaseModel
 
 from ..dependencies import verify_api_key
 
 router = APIRouter(dependencies=[Depends(verify_api_key)])
 
-_JSON_EXPORTS_DIR = Path("data/json_exports")
-_REPORTS_DIR = Path("data/reports")
+_JSON_EXPORTS_DIR = DATA_DIR / "json_exports"
+_REPORTS_DIR = DATA_DIR / "reports"
 
 
 class PatientInfoSummary(BaseModel):

@@ -4,9 +4,10 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import UploadFile
+from module_2_reasoning.paths import DATA_DIR
 
 TEMP_ROOT = Path("temp_files")
-REPORTS_ROOT = Path("data/reports")
+REPORTS_ROOT = DATA_DIR / "reports"
 
 ALLOWED_EXTENSIONS = frozenset([".pdf", ".csv"])
 MAX_FILE_SIZE_BYTES = int(os.getenv("CDSS_MAX_FILE_SIZE_MB", "60")) * 1024 * 1024

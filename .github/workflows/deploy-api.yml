@@ -4,11 +4,7 @@ on:
   push:
     branches: [dev, main]
     paths:
-      - "src/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "Dockerfile"
-      - ".dockerignore"
+      - "api/**"
       - "docker-compose.yaml"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
@@ -41,21 +37,26 @@ jobs:
           set -euo pipefail
           cd "$HOME/$REPO_DIR"
 
+          # One-time move: .env was in the repo root before the backend moved to api/
+          if [ -f .env ] && [ ! -f api/.env ]; then
+            mkdir -p api && mv .env api/.env
+          fi
+
           # .env and data/ are git-ignored, so the reset does not touch them
           git fetch --quiet origin "$BRANCH"
           git reset --hard "origin/$BRANCH"
           echo "Deploying $(git log --oneline -1) to ~/$REPO_DIR"
 
-          docker compose up -d --build --remove-orphans
+          docker compose --env-file api/.env up -d --build --remove-orphans
           docker image prune -f
 
-          container=$(docker compose ps -q api)
+          container=$(docker compose --env-file api/.env ps -q api)
           for _ in $(seq 1 30); do
             status=$(docker inspect -f '{{.State.Health.Status}}' "$container")
             echo "health: $status"
             [ "$status" = healthy ] && exit 0
             sleep 5
           done
-          docker compose logs --tail 50 api
+          docker compose --env-file api/.env logs --tail 50 api
           exit 1
           EOF

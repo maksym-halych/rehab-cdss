@@ -9,17 +9,15 @@ Usage:
     from module_2_reasoning.retrieval import search_protocols, search_exercises
 """
 
-import os
 import threading
-from pathlib import Path
 
 import chromadb
 from chromadb import Collection
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CHROMA_DIR = _PROJECT_ROOT / "data" / "chromadb"
-EMBED_MODEL = "text-embedding-3-small"
+from .embeddings import make_embedding_function
+from .paths import DATA_DIR
+
+CHROMA_DIR = DATA_DIR / "chromadb"
 
 # Lazy singleton state
 _init_lock = threading.Lock()
@@ -56,11 +54,7 @@ def get_collections() -> tuple[Collection, Collection]:
         if _protocols_col is not None and _exercises_col is not None:
             return _protocols_col, _exercises_col
 
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-
-        ef = OpenAIEmbeddingFunction(api_key=openai_key, model_name=EMBED_MODEL)
+        ef = make_embedding_function()
         _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         _protocols_col = _client.get_or_create_collection(
             name="rehab_protocols",

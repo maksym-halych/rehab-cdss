@@ -15,7 +15,7 @@ from langchain_openai import ChatOpenAI
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-load_dotenv(_PROJECT_ROOT / ".env", override=True)
+load_dotenv(_PROJECT_ROOT / "api" / ".env", override=True)
 
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))

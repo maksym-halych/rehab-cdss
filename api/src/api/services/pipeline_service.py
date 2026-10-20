@@ -3,10 +3,12 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from module_2_reasoning.paths import DATA_DIR
+
 from ..models.jobs import JobStatus
 from ..services.job_store import JobStore, _EXECUTOR
 
-REPORTS_ROOT = Path("data/reports")
+REPORTS_ROOT = DATA_DIR / "reports"
 
 
 async def run_pipeline_async(

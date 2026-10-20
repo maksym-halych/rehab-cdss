@@ -25,7 +25,7 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       # main → Vercel Production, dev → Vercel Preview (VITE_* values come from the matching Vercel environment)
       VERCEL_ENV: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
-      DEV_DOMAIN: rehab-cdss-dev.vercel.app
+      DEV_DOMAIN: dev-rehab-cdss.notetaker.uk
       # alias does not read VERCEL_ORG_ID and falls back to the personal account without an explicit scope
       VERCEL_SCOPE: maksymhalych-1559s-projects
     steps:

@@ -9,7 +9,7 @@ ChromaDB (rehab_exercises collection) is used for vector search and persistence.
 
 Exercises are processed one at a time, sequentially.
 
-NOTE: ChromaDB collections are dimension-specific. If changing EMBED_MODEL, clear
+NOTE: ChromaDB collections are dimension-specific. If changing EMBEDDING_PROVIDER/EMBEDDING_MODEL, clear
   data/chromadb/ and re-run this script and 4_populate_chromadb.py.
 """
 
@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 import chromadb
 import requests
 from chromadb import Collection
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from module_2_reasoning.embeddings import make_embedding_function
 from langchain_core.exceptions import OutputParserException
 from langchain_openai import ChatOpenAI
 from rapidfuzz import fuzz
@@ -48,10 +48,9 @@ DB_DIR = _PROJECT_ROOT / "data" / "knowledge_base" / "protocols" / "3_exercises_
 CHROMA_DIR = _PROJECT_ROOT / "data" / "chromadb"
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-LLM_MATCHER_MODEL = "gemini-3.1-pro-preview"
-LLM_GENERATOR_MODEL = "gemini-3.1-pro-preview"
-LLM_FALLBACK_MODEL = "gemini-2.5-pro"
-EMBED_MODEL = "text-embedding-3-small"  # OpenAI model, uses OPENAI_API_KEY
+LLM_MATCHER_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+LLM_GENERATOR_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+LLM_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3-flash-preview")
 TOP_N_CANDIDATES = 20
 DISTANCE_THRESHOLD = 0.35  # cosine distance ≤ 0.35 ↔ similarity ≥ 0.65
 MAX_SUFFIX_SEARCH = 99  # max slug-N to check in find_existing_card_for_slug
@@ -426,11 +425,6 @@ def main() -> None:
     if not diploma_key:
         raise ValueError("DIPLOMA_API_KEY environment variable is required")
 
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        raise ValueError(
-            "OPENAI_API_KEY environment variable is required for embeddings"
-        )
 
     llm_matcher = ChatOpenAI(
         model=LLM_MATCHER_MODEL,
@@ -451,7 +445,7 @@ def main() -> None:
         temperature=0,
     )
 
-    ef = OpenAIEmbeddingFunction(api_key=openai_key, model_name=EMBED_MODEL)
+    ef = make_embedding_function()
     chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     collection = chroma_client.get_or_create_collection(
         name="rehab_exercises",

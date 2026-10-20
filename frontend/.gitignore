@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Vite / TypeScript build artifacts
+.vite
+vite.config.*.timestamp-*
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +27,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel CLI link and build output
+.vercel
+.env*

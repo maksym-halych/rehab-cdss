@@ -1,0 +1,55 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      # main → Vercel Production, dev → Vercel Preview (VITE_* values come from the matching Vercel environment)
+      VERCEL_ENV: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+      DEV_DOMAIN: dev-rehab-cdss.notetaker.uk
+      # alias does not read VERCEL_ORG_ID and falls back to the personal account without an explicit scope
+      VERCEL_SCOPE: maksymhalych-1559s-projects
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings and env vars
+        run: vercel pull --yes --environment="$VERCEL_ENV" --token="$VERCEL_TOKEN"
+
+      - name: Build
+        run: vercel build ${{ env.VERCEL_ENV == 'production' && '--prod' || '' }} --token="$VERCEL_TOKEN"
+
+      - name: Deploy
+        run: |
+          if [ "$VERCEL_ENV" = production ]; then
+            vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          else
+            url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+            echo "Preview: $url"
+            vercel alias set "$url" "$DEV_DOMAIN" --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+          fi

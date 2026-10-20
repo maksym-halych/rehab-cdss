@@ -17,6 +17,8 @@ interface ParamsPanelProps {
   job: Job | null;
   isPolling: boolean;
   currentJobId: string | null;
+  /** False in JSON mode: Module 1 is skipped, so there is no Module 1 DOCX report. */
+  showModule1Report?: boolean;
 }
 
 export const ParamsPanel: React.FC<ParamsPanelProps> = ({
@@ -29,6 +31,7 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({
   job,
   isPolling,
   currentJobId,
+  showModule1Report = true,
 }) => {
   const warnings = job?.warnings ?? [];
   const jobCompleted = job?.status === 'completed';
@@ -58,7 +61,7 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({
           <JobProgressBar job={job} isPolling={isPolling} />
         )}
 
-        {jobCompleted && currentJobId && (
+        {jobCompleted && currentJobId && showModule1Report && (
           <DownloadSection jobId={currentJobId} />
         )}
       </div>

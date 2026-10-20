@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import chromadb
 import requests
 from chromadb import Collection
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+from module_2_reasoning.embeddings import make_embedding_function
 from langchain_core.exceptions import OutputParserException
 from langchain_openai import ChatOpenAI
 
@@ -31,7 +31,6 @@ RAW_DIR = _PROJECT_ROOT / "data" / "knowledge_base" / "protocols" / "1_extracted
 JSON_DIR = _PROJECT_ROOT / "data" / "knowledge_base" / "protocols" / "2_structured_json"
 CHROMA_DIR = _PROJECT_ROOT / "data" / "chromadb"
 
-EMBED_MODEL = "text-embedding-3-small"
 BATCH_SIZE = 5
 
 
@@ -120,26 +119,21 @@ def main() -> None:
     if not api_key:
         raise ValueError("DIPLOMA_API_KEY is required (set in .env or environment)")
 
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if not openai_key:
-        raise ValueError(
-            "OPENAI_API_KEY environment variable is required for ChromaDB embeddings"
-        )
 
     llm = ChatOpenAI(
-        model="gemini-3.1-pro-preview",
+        model=os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview"),
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         api_key=api_key,
         temperature=0,
     )
     fallback_llm = ChatOpenAI(
-        model="gemini-2.5-pro",
+        model=os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3-flash-preview"),
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
         api_key=api_key,
         temperature=0,
     )
 
-    ef = OpenAIEmbeddingFunction(api_key=openai_key, model_name=EMBED_MODEL)
+    ef = make_embedding_function()
     chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     collection = chroma_client.get_or_create_collection(
         name="rehab_protocols",

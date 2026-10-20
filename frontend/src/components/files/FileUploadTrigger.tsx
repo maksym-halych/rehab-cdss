@@ -78,7 +78,7 @@ export const FileUploadTrigger: React.FC<FileUploadTriggerProps> = ({
           type="file"
           multiple
           className={styles.hiddenInput}
-          accept=".pdf,.csv"
+          accept=".pdf,.csv,.json"
           onChange={handleChange}
           aria-label="Оберіть файли для завантаження"
           tabIndex={-1}
@@ -104,7 +104,7 @@ export const FileUploadTrigger: React.FC<FileUploadTriggerProps> = ({
         type="file"
         multiple
         className={styles.hiddenInput}
-        accept=".pdf,.csv"
+        accept=".pdf,.csv,.json"
         onChange={handleChange}
         aria-label="Оберіть файли для завантаження"
         tabIndex={-1}

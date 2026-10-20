@@ -11,9 +11,13 @@ import { useRehabStore } from './store/useRehabStore';
 import { useDetectFiles } from './hooks/useDetectFiles';
 import { useJobPoller } from './hooks/useJobPoller';
 import { useConfig } from './hooks/useConfig';
-import { submitJob } from './api/client';
-import type { UploadedFile } from './api/types';
+import { submitJob, submitJsonJob } from './api/client';
+import { isJsonFile, parseModule1Json } from './api/module1Json';
+import type { Module1JsonPreview, PatientParams, UploadedFile } from './api/types';
 import styles from './App.module.css';
+
+const NO_FILES: UploadedFile[] = [];
+const ACTIVITY_VALUES: PatientParams['activityLevel'][] = ['elite', 'recreational', 'low'];
 
 const BASE_TABS: Tab[] = [
   { key: 'analysis', label: 'Аналіз' },
@@ -42,6 +46,9 @@ export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // JSON mode: a Module 1 export was uploaded, so Module 1 and file detection are skipped.
+  const [jsonPreview, setJsonPreview] = useState<Module1JsonPreview | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const {
     files,
@@ -62,7 +69,7 @@ export default function App() {
 
   const { config } = useConfig();
   const { detectedPeople, fileGroups, fileAssignments, isLoading: isLoadingDetect } = useDetectFiles(
-    files,
+    jsonPreview ? NO_FILES : files,
     patientParams.personName
   );
   const { job, isPolling } = useJobPoller(currentJobId);
@@ -100,15 +107,51 @@ export default function App() {
     });
   };
 
-  const handleFilesAdded = (incoming: UploadedFile[]) => {
-    addFiles(incoming);
+  const handleFilesAdded = async (incoming: UploadedFile[]) => {
     clearJob();
     setSubmitError(null);
+    setUploadError(null);
+
+    const jsonUpload = incoming.find((f) => isJsonFile(f.file));
+    if (!jsonUpload) {
+      // Device files replace a previously loaded JSON export (the two modes don't mix).
+      if (jsonPreview) {
+        clearFiles();
+        setJsonPreview(null);
+      }
+      addFiles(incoming);
+      return;
+    }
+
+    let preview: Module1JsonPreview;
+    try {
+      preview = await parseModule1Json(jsonUpload.file);
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : 'Не вдалося прочитати JSON');
+      return;
+    }
+    // A JSON export replaces everything else: one patient, no Module 1.
+    clearFiles();
+    addFiles([jsonUpload]);
+    setJsonPreview(preview);
+
+    const info = preview.patientInfo;
+    setPatientParam('personName', info.name ?? '');
+    setPatientParam('patientCode', info.patient_code ?? '');
+    setPatientParam('age', typeof info.age === 'number' ? info.age : null);
+    setPatientParam('gender', info.gender ?? null);
+    const level = ACTIVITY_VALUES.find((v) => v === info.activity_level);
+    if (level) setPatientParam('activityLevel', level);
+    if (incoming.length > 1) {
+      setUploadError('Завантажено лише JSON-файл; інші файли пропущено.');
+    }
   };
 
   const handleClear = () => {
     clearFiles();
     clearJob();
+    setJsonPreview(null);
+    setUploadError(null);
     setSubmitError(null);
     setIsProcessing(false);
     setPatientParam('personName', '');
@@ -127,7 +170,16 @@ export default function App() {
 
     const effectivePersonKey = selectedPersonKey || detectedPeople[0]?.key || '';
     try {
-      const result = await submitJob({
+      const result = jsonPreview
+        ? await submitJsonJob({
+            file: files[0].file,
+            age: patientParams.age,
+            gender: patientParams.gender,
+            activityLevel: patientParams.activityLevel,
+            manualPersonName: patientParams.personName,
+            patientCode: patientParams.patientCode,
+          })
+        : await submitJob({
         files: files.map((f) => f.file),
         age: patientParams.age,
         gender: patientParams.gender,
@@ -236,6 +288,8 @@ export default function App() {
             hasFiles={hasFiles}
             totalFiles={totalFiles}
             recognizedFiles={recognizedFiles}
+            jsonPreview={jsonPreview}
+            error={uploadError}
           />
           <ParamsPanel
             params={patientParams}
@@ -247,6 +301,7 @@ export default function App() {
             job={effectiveJob}
             isPolling={isPolling}
             currentJobId={currentJobId}
+            showModule1Report={!jsonPreview}
           />
         </div>
       )}

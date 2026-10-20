@@ -13,13 +13,12 @@ COPY pyproject.toml uv.lock README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
-# Only src/ is copied: the repo root holds stale duplicates of the packages.
-# The install stays editable because retrieval.py finds data/ relative to its own path.
+# data/ is not copied: docker-compose.yaml mounts it at /data (see module_2_reasoning/paths.py).
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-RUN useradd --uid 1000 --create-home app && mkdir -p /app/data && chown app:app /app/data
+RUN useradd --uid 1000 --create-home app && mkdir -p /data && chown app:app /data
 USER app
 
 EXPOSE 8000

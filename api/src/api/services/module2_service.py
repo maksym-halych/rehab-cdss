@@ -5,10 +5,12 @@ import json
 import os
 from pathlib import Path
 
+from module_2_reasoning.paths import DATA_DIR
+
 from ..models.jobs import Module2Status, MODULE2_STEPS
 from ..services.job_store import JobStore, _EXECUTOR
 
-REPORTS_ROOT = Path("data/reports")
+REPORTS_ROOT = DATA_DIR / "reports"
 
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 # Override in .env, e.g. GEMINI_MODEL=gemini-3-flash-preview on the free tier (Pro has 0 free quota).

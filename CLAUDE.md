@@ -8,39 +8,42 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 ## Product
 
 - Module 1 parses device files (PDF, CSV) into a JSON export. Module 1 belongs to the clinic. It is NOT in this repository and NOT installed.
-- Module 2 (`src/module_2_reasoning/`) is a LangGraph pipeline. It reads the Module 1 JSON and makes a bilingual report (Markdown, DOCX).
+- Module 2 (`api/src/module_2_reasoning/`) is a LangGraph pipeline. It reads the Module 1 JSON and makes a bilingual report (Markdown, DOCX).
 - Module 2 uses RAG: ChromaDB with 229 protocols and 1923 exercises. Gemini is the chat model.
 - Without Module 1, use JSON mode: `scripts/demo/generate_module1_json.py` makes synthetic exports, and `POST /api/v1/jobs/from-json` runs Module 2.
 
 ## Layout
 
-| Path                                       | Content                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| `src/api/`                                 | FastAPI app. Routers, services, in-memory `JobStore`               |
-| `src/module_2_reasoning/`                  | LangGraph nodes, filter, retrieval, embeddings, report export      |
-| `src/ui/`                                  | Old Gradio UI. Do not change it. Task E1.2 removes it              |
-| `frontend/`                                | React 19 + TypeScript + Vite + Zustand                             |
-| `scripts/ingest/`                          | Steps 1–4 that build the knowledge base in `data/`                 |
-| `data/`                                    | Git-ignored. ChromaDB, knowledge base, reports, JSON exports       |
-| Root `api/`, `module_2_reasoning/`, `*.py` | Old duplicates. Do not edit or import them. Task E1.1 removes them |
+| Path                          | Content                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `api/`                        | Python backend: `pyproject.toml`, `uv.lock`, `Dockerfile`, `.env`       |
+| `api/src/api/`                | FastAPI app. Routers, services, in-memory `JobStore`                    |
+| `api/src/module_2_reasoning/` | LangGraph nodes, filter, retrieval, embeddings, report export, paths    |
+| `api/src/ui/`                 | Old Gradio UI. Do not change it. Task E1.2 removes it                   |
+| `scripts/`                    | Repo tools: `ingest/` (steps 1–4 that build `data/`), `demo/`, `module2/` |
+| `frontend/`                   | React 19 + TypeScript + Vite + Zustand                                  |
+| `data/`                       | Git-ignored. ChromaDB, knowledge base, reports, JSON exports            |
+| Root files                    | `docker-compose.yaml`, CI workflows, docs                               |
 
 ## Commands
 
 ```bash
-uv sync                                                          # Python 3.12 only
-uv run python scripts/demo/generate_module1_json.py --scenario acl_left
-uv run --env-file .env rehab-api                                 # API on :8000, docs on /api/docs
+cd api && uv sync                                                # Python 3.12 only
+cd api && uv run --env-file .env rehab-api                       # API on :8000, docs on /api/docs
+cd api && uv run ruff check src
+uv run --project api python scripts/demo/generate_module1_json.py --scenario acl_left
+uv run --project api ruff check scripts
 cd frontend && npm install && npm run dev                        # UI on :5173
 cd frontend && npm run build && npm run lint
-uv run ruff check src
 ```
 
-- Start the API only with `rehab-api`. `uvicorn` from the root loads the old duplicates.
+- Run API commands in `api/`. Run `scripts/` from the root with `uv run --project api`, so they use the `api/` environment.
+- Code in `api/src/` finds `data/` through `module_2_reasoning.paths.DATA_DIR`. Do not write paths relative to the working directory.
 - There are no automated tests and no CI checks yet. Tasks E6.1 and E6.2 add them.
 
 ## Configuration
 
-- Copy `.env.example` to `.env`. Do not commit `.env`.
+- Copy `api/.env.example` to `api/.env`. Do not commit `.env`.
 - `DIPLOMA_API_KEY` is the Gemini key. `CDSS_API_KEYS` empty means the API accepts all requests.
 - The embedding provider and model must be the same as the ones that built `data/chromadb/`. If you change them, delete `data/chromadb/` and run the ingest again.
 - The free Gemini tier gives 20 requests per day per model. Do not run full pipelines without need.
@@ -48,7 +51,7 @@ uv run ruff check src
 ## Deployment
 
 - A push to `dev` deploys the dev environment. A push to `main` deploys prod.
-- API: GitHub Actions → VPS → `docker compose up --build`. Frontend: GitHub Actions → Vercel.
+- API: GitHub Actions → VPS → `docker compose --env-file api/.env up --build`. The `--env-file` flag gives `HOST_PORT` to the port mapping. Frontend: GitHub Actions → Vercel.
 - `docker-compose.yaml` is the server setup. Do not change its ports or project names for local use.
 - The API runs with one worker, because `JobStore` keeps jobs in memory.
 

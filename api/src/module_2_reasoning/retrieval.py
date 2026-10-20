@@ -10,15 +10,14 @@ Usage:
 """
 
 import threading
-from pathlib import Path
 
 import chromadb
 from chromadb import Collection
 
 from .embeddings import make_embedding_function
+from .paths import DATA_DIR
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-CHROMA_DIR = _PROJECT_ROOT / "data" / "chromadb"
+CHROMA_DIR = DATA_DIR / "chromadb"
 
 # Lazy singleton state
 _init_lock = threading.Lock()

@@ -6,6 +6,16 @@ My bachelor's thesis project — a Clinical Decision Support System (CDSS) for p
 
 **Repository scope.** Module 1 is not included — it belongs to the partner clinic. Module 2 and the API/UI layers are available here.
 
+## Layout
+
+| Path                  | Content                                                                  |
+| --------------------- | ------------------------------------------------------------------------ |
+| [`api/`](api/)        | Python backend: FastAPI and Module 2. See [api/README.md](api/README.md) |
+| [`frontend/`](frontend/) | React frontend. See [frontend/README.md](frontend/README.md)          |
+| `scripts/`            | Knowledge base ingest, demo data, CLI pipeline. Run with `uv run --project api` |
+| `data/`               | Git-ignored. ChromaDB, knowledge base, reports, JSON exports             |
+| `docker-compose.yaml` | Server setup. Run with `docker compose --env-file api/.env up --build`   |
+
 ## DNS
 
 The zone `notetaker.uk` is on Cloudflare. All records for this project use the `rehab-cdss` suffix.

@@ -7,7 +7,7 @@ Reads all JSONs from:
   data/knowledge_base/protocols/3_exercises_db/      → rehab_exercises collection
 
 Safe to re-run — upsert is idempotent.
-Requires: OPENAI_API_KEY
+Requires: the embedding key from api/.env (EMBEDDING_PROVIDER)
 """
 
 import json
@@ -15,9 +15,11 @@ import sys
 from pathlib import Path
 
 import chromadb
+from dotenv import load_dotenv
 from module_2_reasoning.embeddings import make_embedding_function
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
+load_dotenv(_SCRIPT_DIR.parent.parent / "api" / ".env", override=True)
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 

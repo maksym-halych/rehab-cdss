@@ -1,31 +1,15 @@
-#!/usr/bin/env python3
-"""
-Synthetic Module 1 output generator — for testing and demos without Module 1.
+"""Synthetic Module 1 exports for demos and tests without Module 1.
 
-Module 1 (scanner/device file parsing) is not part of this repository. This
-script produces JSON in the shape Module 2 consumes (see
-src/module_2_reasoning/filter.py), filled with plausible, scenario-driven
-measurements. All patients and values are fictional.
-
-Usage:
-    uv run python scripts/demo/generate_module1_json.py [--scenario NAME] [--seed N] ...
-    uv run python scripts/demo/generate_module1_json.py --list
-
-Output (default): data/json_exports/{timestamp}_{patient_code}.json
-which scripts/module2/run_pipeline.py picks up automatically as the latest export.
+Module 1 (device file parsing) belongs to the clinic and is not in this repository.
+This module makes JSON in the shape Module 2 reads (see module_2_reasoning/filter.py),
+with plausible values for a clinical scenario. All patients and values are fictional.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
-
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_OUT_DIR = _PROJECT_ROOT / "data" / "json_exports"
 
 GENDERS = {"male": "Чоловік", "female": "Жінка"}
 ACTIVITY_LEVELS = ("elite", "recreational", "low")
@@ -320,7 +304,7 @@ SCENARIOS: dict[str, Scenario] = {
         defaults={"age": 22, "gender": "female", "activity_level": "elite"},
     ),
     "random": Scenario(
-        description="Random selection of tests and random deficits (use --seed for reproducibility).",
+        description="Random selection of tests and random deficits (pass a seed for the same output).",
         tests=(),
         deficits={},
         texts={},
@@ -439,57 +423,3 @@ def build_patient(
         "patient_info": patient_info,
         "test_results": test_results,
     }
-
-
-def _count_out_of_norm(data: dict) -> int:
-    n = 0
-    for tr in data["test_results"]:
-        for table in tr["results"]["tables"]:
-            for row in table["rows"]:
-                lo, hi = row["norm"]
-                vals = [row[k] for k in ("value", "left", "right") if k in row]
-                asym = row.get("asymmetry_percent", 0) > (row.get("asymmetry_norm_max") or 1e9)
-                n += any(v < lo or v > hi for v in vals) or asym
-    return n
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate synthetic Module 1 JSON exports.")
-    parser.add_argument("--scenario", choices=sorted(SCENARIOS), default="acl_left")
-    parser.add_argument("--list", action="store_true", help="List scenarios and exit.")
-    parser.add_argument("--count", type=int, default=1, help="Number of patients to generate.")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducible output.")
-    parser.add_argument("--age", type=int)
-    parser.add_argument("--gender", choices=sorted(GENDERS))
-    parser.add_argument("--activity-level", choices=ACTIVITY_LEVELS)
-    parser.add_argument("--name", help="Patient display name (fictional).")
-    parser.add_argument("--code", help="Patient code.")
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    args = parser.parse_args()
-
-    if args.list:
-        for name, sc in SCENARIOS.items():
-            print(f"{name:18} {sc.description}")
-        return
-
-    rng = random.Random(args.seed)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    for i in range(args.count):
-        data = build_patient(
-            args.scenario, rng, args.age, args.gender, args.activity_level, args.name, args.code
-        )
-        code = data["patient_info"]["patient_code"]
-        suffix = f"_{i + 1}" if args.count > 1 else ""
-        out_path = args.out_dir / f"{stamp}_{code}{suffix}.json"
-        out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(
-            f"Wrote {out_path.relative_to(_PROJECT_ROOT) if out_path.is_relative_to(_PROJECT_ROOT) else out_path}"
-            f"  [{args.scenario}] {len(data['test_results'])} tests, "
-            f"{_count_out_of_norm(data)} out-of-norm rows"
-        )
-
-
-if __name__ == "__main__":
-    main()

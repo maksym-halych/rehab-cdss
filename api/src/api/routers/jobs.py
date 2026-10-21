@@ -232,7 +232,7 @@ async def create_job_from_json(
     """Run Module 2 directly on an uploaded Module 1 JSON export (skips Module 1).
 
     Intended for testing and demos with synthetic exports
-    (scripts/demo/generate_module1_json.py). Non-empty form fields override
+    (GET /api/v1/demo/module1-json). Non-empty form fields override
     the matching ``patient_info`` values from the JSON.
     """
     raw = await file.read(MAX_JSON_SIZE_BYTES + 1)

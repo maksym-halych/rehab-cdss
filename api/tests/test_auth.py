@@ -76,6 +76,11 @@ def test_missing_token_is_rejected(client):
     assert response.headers["WWW-Authenticate"] == "Bearer"
 
 
+def test_demo_json_needs_a_token(client):
+    response = client.get("/api/v1/demo/module1-json")
+    assert response.status_code == 401
+
+
 def test_expired_token_is_rejected(client):
     past = int(time.time()) - 600
     token = make_token(iat=past - 60, nbf=past - 60, exp=past)

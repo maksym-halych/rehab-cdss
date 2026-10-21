@@ -12,7 +12,7 @@ My bachelor's thesis project — a Clinical Decision Support System (CDSS) for p
 | ------------------------ | ------------------------------------------------------------------------------- |
 | [`api/`](api/)           | Python backend: FastAPI and Module 2. See [api/README.md](api/README.md)        |
 | [`frontend/`](frontend/) | React frontend. See [frontend/README.md](frontend/README.md)                    |
-| `scripts/`               | Knowledge base ingest, demo data, CLI pipeline. Run with `uv run --project api` |
+| `scripts/`               | Knowledge base ingest, CLI pipeline. Run with `uv run --project api`            |
 | `data/`                  | Git-ignored. ChromaDB, knowledge base, reports, JSON exports                    |
 | `docker-compose.yaml`    | Server setup. Run with `docker compose --env-file api/.env up --build`          |
 

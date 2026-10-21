@@ -33,6 +33,12 @@ MODULE2_STEPS = [
 @dataclass
 class Job:
     job_id: str
+    # Clerk user ID of the doctor who started the job
+    created_by: str | None = None
+    # Patient context for the job list; no names or IDs (NFR-01)
+    age: int | None = None
+    gender: str | None = None
+    activity_level: str | None = None
     status: JobStatus = JobStatus.PENDING
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: datetime | None = None

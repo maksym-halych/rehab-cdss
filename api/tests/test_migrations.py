@@ -32,6 +32,9 @@ VALID_JOB = {
     "module2_status": "idle",
     "module2_step_index": 0,
     "module2_total_steps": 9,
+    "age": 30,
+    "gender": "Жінка",
+    "activity_level": "recreational",
 }
 
 
@@ -46,18 +49,14 @@ def alembic_config(monkeypatch):
 
 
 async def _insert(job):
+    columns = ", ".join(job)
+    # warnings is JSONB; the other values need no cast
+    values = ", ".join("CAST(:warnings AS jsonb)" if k == "warnings" else f":{k}" for k in job)
     engine = create_engine(database_url())
     try:
         async with engine.begin() as connection:
             await connection.execute(
-                text(
-                    "INSERT INTO cdss.jobs (job_id, created_by, status, created_at, warnings,"
-                    " module2_status, module2_step_index, module2_total_steps)"
-                    " VALUES (:job_id, :created_by, :status, :created_at,"
-                    " CAST(:warnings AS jsonb), :module2_status, :module2_step_index,"
-                    " :module2_total_steps)"
-                ),
-                job,
+                text(f"INSERT INTO cdss.jobs ({columns}) VALUES ({values})"), job
             )
     finally:
         await engine.dispose()
@@ -97,6 +96,8 @@ def test_valid_job_is_accepted(alembic_config):
         pytest.param({"module2_step_index": -1}, id="negative-step"),
         pytest.param({"module2_step_index": 10}, id="step-after-last"),
         pytest.param({"created_by": None}, id="no-owner"),
+        pytest.param({"age": -1}, id="negative-age"),
+        pytest.param({"age": 121}, id="age-over-120"),
     ],
 )
 def test_constraints_reject_invalid_jobs(alembic_config, change):

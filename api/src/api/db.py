@@ -35,12 +35,17 @@ class JobRow(Base):
             "module2_step_index >= 0 AND module2_step_index <= module2_total_steps",
             name="module2_step_index",
         ),
+        CheckConstraint("age >= 0 AND age <= 120", name="age"),
         Index(None, "created_by", "created_at"),
     )
 
     job_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     # Clerk user ID (token "sub"). No users table: Clerk keeps the users (ADR-03)
     created_by: Mapped[str] = mapped_column(String(64))
+    # Patient context for the job list. No names, birth dates or patient IDs (NFR-01)
+    age: Mapped[int | None] = mapped_column(Integer)
+    gender: Mapped[str | None] = mapped_column(String(32))
+    activity_level: Mapped[str | None] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,7 +1,7 @@
 # ADR-04: Jobs in Postgres (Supabase)
 
 Status: Proposed. The TL and PO must approve it before the merge into `main`.
-Task: E3.1 (#25).
+Tasks: E3.1 (#25). The job owner check is part of E2.4.
 
 ## Context
 
@@ -17,6 +17,8 @@ E3.1 asks for PostgreSQL with Alembic migrations and a base schema for users, pa
 
 - Postgres 16 keeps one table: `cdss.jobs`.
 - Each row is one analysis run: status, Module 2 progress, errors, warnings, report file paths and `created_by` (Clerk user ID).
+- The row also keeps age, gender and activity level, so the doctor can tell the jobs apart in "Мої аналізи". It keeps no names, birth dates or patient IDs (NFR-01).
+- A doctor sees and opens only own jobs. An admin sees all jobs. For another user's job the API returns 404.
 - Report files stay in `data/reports/`. The database keeps only their paths.
 - The tables are in the `cdss` schema, not `public`.
 - The Supabase Data API is off. With the `cdss` schema, the table also stays out of a Data API that someone turns on later.
@@ -31,13 +33,13 @@ E3.1 asks for PostgreSQL with Alembic migrations and a base schema for users, pa
 | Criterion | How |
 | --- | --- |
 | PostgreSQL 16 runs locally; the connection uses environment variables | Postgres 16 runs in Docker (README, Database). The API reads `DATABASE_URL` and does not start without it. |
-| The base schema has Alembic migrations | `api/migrations/versions/0001_create_jobs_table.py`. Only `jobs`, see Context. |
+| The base schema has Alembic migrations | `api/migrations/versions/` (0001 creates `jobs`, 0002 adds the patient context). Only `jobs`, see Context. |
 | Migrations run on an empty database; constraints are checked | `api/tests/test_migrations.py` on Postgres 16 in CI: upgrade, downgrade, upgrade, check constraints, primary key |
 
 ## Consequences
 
 - Jobs and report links stay after a restart or a deploy.
-- `created_by` makes "only my jobs" (E2.4) possible without a migration of old rows.
+- The frontend has a "Мої аналізи" tab. A doctor opens an earlier report from it after a reload or a deploy.
 - The servers need `DATABASE_URL` in `api/.env` before the deploy. Without it the API does not start.
 - Free Supabase projects pause after 7 days without activity. Restore the dev project in the dashboard.
 - A local `DATABASE_URL` must not point to the dev Supabase project: at startup the local API would fail the jobs of the dev server.

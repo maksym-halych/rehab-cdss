@@ -54,7 +54,7 @@ def test_list_is_newest_first_and_delete_removes(database_url):
     async def scenario(store):
         first = await store.create(created_by="user_a")
         second = await store.create(created_by="user_a")
-        listed = [j.job_id for j in await store.list_all()]
+        listed = [j.job_id for j in (await store.list())[0]]
         await store.delete(first.job_id)
         return first, second, listed, await store.get(first.job_id)
 
@@ -95,3 +95,25 @@ def test_unfinished_jobs_fail_after_restart(database_url, values, expected):
         assert "restart" in job.error and job.completed_at is not None
     if values.get("module2_status") is Module2Status.RUNNING:
         assert "restart" in job.module2_error
+
+
+def test_list_filters_by_owner_and_status(database_url):
+    async def scenario(store):
+        mine = await store.create(created_by="user_a", age=30, activity_level="low")
+        await store.create(created_by="user_b")
+        done = await store.create(created_by="user_a")
+        await store.update(done.job_id, status=JobStatus.COMPLETED)
+        return (
+            mine,
+            await store.list(created_by="user_a"),
+            await store.list(created_by="user_a", status="completed"),
+            await store.list(),
+            await store.list(created_by="user_a", limit=1, offset=1),
+        )
+
+    mine, own, completed, everyone, second_page = run(_with_store(database_url, scenario))
+    assert own[1] == 2 and {j.created_by for j in own[0]} == {"user_a"}
+    assert completed[1] == 1 and completed[0][0].status is JobStatus.COMPLETED
+    assert everyone[1] == 3
+    assert second_page[1] == 2 and [j.job_id for j in second_page[0]] == [mine.job_id]
+    assert (second_page[0][0].age, second_page[0][0].activity_level) == (30, "low")

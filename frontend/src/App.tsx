@@ -5,6 +5,7 @@ import { RehabLayout } from './components/layout/RehabLayout';
 import { FilesPanel } from './components/layout/FilesPanel';
 import { ParamsPanel } from './components/layout/ParamsPanel';
 import { RecommendationsPanel } from './components/layout/RecommendationsPanel';
+import { JobHistoryPanel } from './components/history/JobHistoryPanel';
 import { TabNav } from './components/ui/TabNav';
 import type { Tab } from './components/ui/TabNav';
 import { Button } from './components/ui/Button';
@@ -23,6 +24,7 @@ const ACTIVITY_VALUES: PatientParams['activityLevel'][] = ['elite', 'recreationa
 const BASE_TABS: Tab[] = [
   { key: 'analysis', label: 'Аналіз' },
   { key: 'recommendations', label: 'Клінічні рекомендації' },
+  { key: 'history', label: 'Мої аналізи' },
 ];
 
 function AppHeader({ isDark, onToggleTheme }: { isDark: boolean; onToggleTheme: () => void }) {
@@ -159,6 +161,13 @@ export default function App() {
     setSubmitError(null);
     setIsProcessing(false);
     setPatientParam('personName', '');
+  };
+
+  // Opens a saved job: its report is on the recommendations tab
+  const handleOpenJob = (jobId: string) => {
+    handleClear();
+    setCurrentJobId(jobId);
+    setActiveTab('recommendations');
   };
 
   const handleRemoveFile = (fileName: string) => {
@@ -312,6 +321,10 @@ export default function App() {
 
       {activeTab === 'recommendations' && (
         <RecommendationsPanel job={effectiveJob} currentJobId={currentJobId} />
+      )}
+
+      {activeTab === 'history' && (
+        <JobHistoryPanel currentJobId={currentJobId} config={config} onOpen={handleOpenJob} />
       )}
     </RehabLayout>
   );

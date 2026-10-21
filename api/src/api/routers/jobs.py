@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 import asyncio
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
-from ..dependencies import CurrentUser, get_current_user, get_job_store
+from ..dependencies import CurrentUser, get_current_user, get_job_store, get_owned_job
 from ..services.file_service import save_uploads
 from ..models.jobs import Job, JobStatus, Module2Status
 from ..services.job_store import JobStore
@@ -52,8 +52,13 @@ class JobStatusResponse(BaseModel):
 class JobSummary(BaseModel):
     job_id: str
     status: str
+    module2_status: str
     created_at: str
     completed_at: Optional[str] = None
+    # Patient context to tell the jobs apart; no names or patient IDs
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    activity_level: Optional[str] = None
 
 
 class JobListResponse(BaseModel):
@@ -150,7 +155,12 @@ async def create_job(
         )
 
     # Create job
-    job = await job_store.create(created_by=user.user_id)
+    job = await job_store.create(
+        created_by=user.user_id,
+        age=age,
+        gender=gender[:32] if gender else None,
+        activity_level=activity_level,
+    )
 
     # Save uploads to disk
     try:
@@ -273,7 +283,16 @@ async def create_job_from_json(
     patient_info.update({k: v for k, v in overrides.items() if v not in (None, "")})
     data["patient_info"] = patient_info
 
-    job = await job_store.create(created_by=user.user_id)
+    json_age = patient_info.get("age")
+    json_gender = patient_info.get("gender")
+    json_level = patient_info.get("activity_level")
+    job = await job_store.create(
+        created_by=user.user_id,
+        # Only valid values from the JSON go to the job list
+        age=json_age if isinstance(json_age, int) and 0 <= json_age <= 120 else None,
+        gender=json_gender[:32] if isinstance(json_gender, str) and json_gender else None,
+        activity_level=json_level if json_level in ALLOWED_ACTIVITY_LEVELS else None,
+    )
     job_dir = REPORTS_ROOT / job.job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     json_path = job_dir / "module1_export.json"
@@ -301,22 +320,29 @@ async def create_job_from_json(
 @router.get("/jobs", response_model=JobListResponse)
 async def list_jobs(
     status: Optional[str] = None,
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
     job_store: JobStore = Depends(get_job_store),
 ) -> JobListResponse:
-    all_jobs = await job_store.list_all()
-    if status:
-        all_jobs = [j for j in all_jobs if j.status.value == status]
-    total = len(all_jobs)
-    page = all_jobs[offset : offset + limit]
+    """The user's jobs, newest first. An admin gets the jobs of all users."""
+    page, total = await job_store.list(
+        created_by=None if user.is_admin else user.user_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
     return JobListResponse(
         jobs=[
             JobSummary(
                 job_id=j.job_id,
                 status=j.status.value,
+                module2_status=j.module2_status.value,
                 created_at=j.created_at.isoformat(),
                 completed_at=j.completed_at.isoformat() if j.completed_at else None,
+                age=j.age,
+                gender=j.gender,
+                activity_level=j.activity_level,
             )
             for j in page
         ],
@@ -326,32 +352,19 @@ async def list_jobs(
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job(
-    job_id: str,
-    job_store: JobStore = Depends(get_job_store),
+    job: Job = Depends(get_owned_job),
 ) -> JobStatusResponse:
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     return _job_to_status_response(job)
 
 
 @router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job(
-    job_id: str,
+    job: Job = Depends(get_owned_job),
     job_store: JobStore = Depends(get_job_store),
 ) -> None:
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     if job.status == JobStatus.RUNNING or job.module2_status == Module2Status.RUNNING:
         raise HTTPException(
             status_code=409,
             detail={"code": "JOB_RUNNING", "message": "Cannot cancel a running job"},
         )
-    await job_store.delete(job_id)
+    await job_store.delete(job.job_id)

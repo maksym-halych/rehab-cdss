@@ -1,4 +1,4 @@
-import type { DetectFilesResponse, Job, ConfigResponse } from './types';
+import type { DetectFilesResponse, Job, JobListResponse, ConfigResponse } from './types';
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 // Set by AuthGate: the Clerk session token getter and the handler for 401/403 responses
@@ -79,6 +79,13 @@ export async function submitJsonJob(params: {
 
 export async function getJob(jobId: string): Promise<Job> {
   const res = await apiFetch(`${BASE}/api/v1/jobs/${jobId}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// The API returns only the signed-in user's jobs (an admin gets all jobs)
+export async function listJobs(limit = 50): Promise<JobListResponse> {
+  const res = await apiFetch(`${BASE}/api/v1/jobs?limit=${limit}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

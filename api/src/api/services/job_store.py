@@ -5,7 +5,7 @@ from dataclasses import fields
 from datetime import datetime, timezone
 from enum import Enum
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from ..db import JobRow
@@ -46,11 +46,23 @@ class JobStore:
         self._engine = engine
         self._session = async_sessionmaker(engine, expire_on_commit=False)
 
-    async def create(self, created_by: str) -> Job:
-        job = Job(job_id=str(uuid.uuid4()))
+    async def create(
+        self,
+        created_by: str,
+        age: int | None = None,
+        gender: str | None = None,
+        activity_level: str | None = None,
+    ) -> Job:
+        job = Job(
+            job_id=str(uuid.uuid4()),
+            created_by=created_by,
+            age=age,
+            gender=gender,
+            activity_level=activity_level,
+        )
         values = {name: _to_db(getattr(job, name)) for name in _JOB_FIELDS}
         async with self._session.begin() as session:
-            session.add(JobRow(**values, created_by=created_by))
+            session.add(JobRow(**values))
         return job
 
     async def get(self, job_id: str) -> Job | None:
@@ -67,10 +79,25 @@ class JobStore:
         async with self._session.begin() as session:
             await session.execute(delete(JobRow).where(JobRow.job_id == job_id))
 
-    async def list_all(self) -> list[Job]:
+    async def list(
+        self,
+        created_by: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Job], int]:
+        """Newest jobs first and the total count. created_by=None lists the jobs of all users."""
+        query = select(JobRow)
+        if created_by is not None:
+            query = query.where(JobRow.created_by == created_by)
+        if status:
+            query = query.where(JobRow.status == status)
         async with self._session() as session:
-            rows = await session.scalars(select(JobRow).order_by(JobRow.created_at.desc()))
-            return [_to_job(row) for row in rows]
+            total = await session.scalar(select(func.count()).select_from(query.subquery()))
+            rows = await session.scalars(
+                query.order_by(JobRow.created_at.desc()).limit(limit).offset(offset)
+            )
+            return [_to_job(row) for row in rows], total or 0
 
     async def fail_unfinished(self) -> None:
         """Mark jobs that were running when the API stopped as failed.

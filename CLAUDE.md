@@ -98,5 +98,5 @@ uv run --project api pre-commit run --all-files
 - The API accepts only a Clerk session token (`Authorization: Bearer`). `api.dependencies.get_current_user` checks it and returns the Clerk user ID and the role. `/api/v1/health` is public.
 - The role (`doctor` or `admin`) is in the Clerk user's public metadata. A session token template copies it into the `role` claim. A user without a role gets 403.
 - The API does not start without `CLERK_ISSUER`.
-- Jobs are in Postgres, table `cdss.jobs` (ADR-04). Only this table for now. Add patients, reports or audit tables when a feature needs them. Use the `cdss` schema, not `public`.
+- Jobs are in Postgres, table `cdss.jobs` (ADR-04). A doctor sees only own jobs (`created_by`); an admin sees all. `api.dependencies.get_owned_job` returns 404 for another user's job. The job keeps age, gender and activity level for the "Мої аналізи" list, never names or patient IDs. Only this table for now. Add patients, reports or audit tables when a feature needs them. Use the `cdss` schema, not `public`.
 - Change the schema only with an Alembic migration. Do not edit an applied migration.

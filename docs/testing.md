@@ -39,7 +39,8 @@ The test and build checks need no clinic package, real patient data or provider 
 - Retrieval: metadata exclusions, empty results and ordering of protocol sections.
 - Module 2: synthetic JSON through the real LangGraph pipeline, Markdown renderer and DOCX exporter.
 - JSON API: upload, form overrides, background processing, status polling, report downloads and existing input/size rejection rules.
-- Job store: save, update, list, delete, jobs after a restart, and failing jobs that a restart interrupted (SQLite).
+- Job store: save, update, list by owner and status, delete, jobs after a restart, and failing jobs that a restart interrupted (SQLite).
+- Job access: a doctor lists and opens only own jobs, an admin sees all, another user's job gives 404, and the list has no identity fields.
 - Migrations on Postgres 16: upgrade on an empty database, downgrade and upgrade again, check constraints and the primary key.
 - Patient identity fields are excluded from the report-generation prompt. Tests check that synthetic identity sentinels do not reach LLM prompts or output reports.
 

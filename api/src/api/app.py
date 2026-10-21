@@ -1,5 +1,4 @@
 import os
-import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -71,11 +70,3 @@ def launch_api() -> None:
         reload=False,
     )
 
-
-def launch_all() -> None:
-    """Start both Gradio (port 7860) and FastAPI (port 8000) in one process."""
-    from ui.app import launch_app as _launch_gradio
-
-    api_thread = threading.Thread(target=launch_api, daemon=True)
-    api_thread.start()
-    _launch_gradio()

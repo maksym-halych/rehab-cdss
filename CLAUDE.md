@@ -27,18 +27,22 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 ## Commands
 
 ```bash
+make                                                             # list shortcuts: pre-commit, api, frontend
 cd api && uv sync                                                # Python 3.12 only
 cd api && uv run --env-file .env rehab-api                       # API on :8000, docs on /api/docs
 cd api && uv run ruff check src
 uv run --project api python scripts/demo/generate_module1_json.py --scenario acl_left
 uv run --project api ruff check scripts
-cd frontend && npm install && npm run dev                        # UI on :5173
+cd frontend && npm install && npm run dev                        # UI on :3000
 cd frontend && npm run build && npm run lint
+uv run --project api pre-commit install                          # once: ruff and ESLint on each commit
+uv run --project api pre-commit run --all-files
 ```
 
 - Run API commands in `api/`. Run `scripts/` from the root with `uv run --project api`, so they use the `api/` environment.
 - Code in `api/src/` finds `data/` through `module_2_reasoning.paths.DATA_DIR`. Do not write paths relative to the working directory.
-- There are no automated tests and no CI checks yet. Tasks E6.1 and E6.2 add them.
+- CI (`.github/workflows/ci.yml`) runs on each PR into `dev` and `main`: ruff, ESLint (warnings fail), and the frontend type check and build.
+- There are no automated tests yet. Task E6.2 adds them.
 
 ## Configuration
 

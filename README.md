@@ -16,6 +16,18 @@ My bachelor's thesis project — a Clinical Decision Support System (CDSS) for p
 | `data/`               | Git-ignored. ChromaDB, knowledge base, reports, JSON exports             |
 | `docker-compose.yaml` | Server setup. Run with `docker compose --env-file api/.env up --build`   |
 
+## Checks
+
+CI runs ruff, ESLint and the frontend build on each pull request.
+Run the same checks before each commit with [pre-commit](https://pre-commit.com):
+
+```bash
+uv run --project api pre-commit install
+make pre-commit                                  # all hooks on all files
+```
+
+`make` lists the other shortcuts: `make api` (API on :8000), `make frontend` (UI on :3000).
+
 ## DNS
 
 The zone `notetaker.uk` is on Cloudflare. All records for this project use the `rehab-cdss` suffix.
@@ -29,3 +41,9 @@ The zone `notetaker.uk` is on Cloudflare. All records for this project use the `
 
 Frontend records must be **DNS only**, so that Vercel can issue the TLS certificate. The CNAME target is the project-specific value from *Project → Settings → Domains*; `cname.vercel-dns.com` also works as a fallback.
 >
+
+## Deploy notifications
+
+Both deploy workflows send the result to a Telegram chat: status, branch, the user, the merged PR and a link to the run.
+Repository secrets: `TELEGRAM_BOT_TOKEN` (from @BotFather) and `TELEGRAM_CHAT_ID` (the group ID is negative).
+Without these secrets, the deploy runs as usual and only writes a warning.

@@ -197,16 +197,16 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (job?.status === 'failed') {
+  // Stop processing when the job reaches a terminal state (state adjusted during render, not in an effect)
+  const jobStatusKey = `${job?.status}:${job?.module2_status}`;
+  const [prevJobStatusKey, setPrevJobStatusKey] = useState(jobStatusKey);
+  if (jobStatusKey !== prevJobStatusKey) {
+    setPrevJobStatusKey(jobStatusKey);
+    const m2Done = job?.module2_status === 'completed' || job?.module2_status === 'failed';
+    if (job?.status === 'failed' || (job?.status === 'completed' && m2Done)) {
       setIsProcessing(false);
-      return;
     }
-    if (job?.status === 'completed' &&
-        (job?.module2_status === 'completed' || job?.module2_status === 'failed')) {
-      setIsProcessing(false);
-    }
-  }, [job?.status, job?.module2_status]);
+  }
 
   const hasFiles = files.length > 0;
 

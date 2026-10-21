@@ -12,6 +12,10 @@ concurrency:
   group: vercel-${{ github.ref_name }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: read # the Telegram notification finds the merged PR
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -53,3 +57,14 @@ jobs:
             echo "Preview: $url"
             vercel alias set "$url" "$DEV_DOMAIN" --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
           fi
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/telegram-notify
+        with:
+          target: Frontend
+          status: ${{ job.status }}
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          github-token: ${{ github.token }}

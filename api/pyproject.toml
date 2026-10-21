@@ -32,5 +32,6 @@ rehab-api = "api.app:launch_api"
 
 [dependency-groups]
 dev = [
+    "pre-commit==4.7.0",
     "ruff==0.15.4",
 ]

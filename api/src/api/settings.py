@@ -19,3 +19,15 @@ def allowed_origins() -> list[str]:
 def clerk_issuer() -> str:
     """Clerk Frontend API URL, for example https://example.clerk.accounts.dev."""
     return os.getenv("CLERK_ISSUER", "").strip().rstrip("/")
+
+
+def database_url() -> str:
+    """SQLAlchemy URL of the Postgres database, with the async driver.
+
+    Supabase and docker show "postgresql://..." URLs; they are changed to asyncpg here.
+    """
+    url = os.getenv("DATABASE_URL", "").strip()
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+asyncpg://" + url[len(prefix):]
+    return url

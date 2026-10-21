@@ -8,13 +8,13 @@ My bachelor's thesis project — a Clinical Decision Support System (CDSS) for p
 
 ## Layout
 
-| Path                  | Content                                                                  |
-| --------------------- | ------------------------------------------------------------------------ |
-| [`api/`](api/)        | Python backend: FastAPI and Module 2. See [api/README.md](api/README.md) |
-| [`frontend/`](frontend/) | React frontend. See [frontend/README.md](frontend/README.md)          |
-| `scripts/`            | Knowledge base ingest, demo data, CLI pipeline. Run with `uv run --project api` |
-| `data/`               | Git-ignored. ChromaDB, knowledge base, reports, JSON exports             |
-| `docker-compose.yaml` | Server setup. Run with `docker compose --env-file api/.env up --build`   |
+| Path                     | Content                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| [`api/`](api/)           | Python backend: FastAPI and Module 2. See [api/README.md](api/README.md)        |
+| [`frontend/`](frontend/) | React frontend. See [frontend/README.md](frontend/README.md)                    |
+| `scripts/`               | Knowledge base ingest, demo data, CLI pipeline. Run with `uv run --project api` |
+| `data/`                  | Git-ignored. ChromaDB, knowledge base, reports, JSON exports                    |
+| `docker-compose.yaml`    | Server setup. Run with `docker compose --env-file api/.env up --build`          |
 
 ## Checks
 
@@ -36,11 +36,11 @@ See [backend tests and CI](docs/testing.md) for local checks and the synthetic J
 
 Users sign in with Clerk. Sign-up is invite-only. See [ADR-03](docs/adr/ADR-03-auth-clerk.md).
 
-| Setting | Where | Value |
-| --- | --- | --- |
-| `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env`, Vercel env (Preview and Production) | `pk_test_…` (dev instance) or `pk_live_…` (prod instance) |
-| `CLERK_ISSUER` | `api/.env` locally and on the VPS | Clerk Frontend API URL, for example `https://simple-cicada-2857.clerk.accounts.dev` |
-| `CDSS_ALLOWED_ORIGINS` | `api/.env` on the VPS | The frontend URL. The API rejects tokens from other origins. |
+| Setting                      | Where                                                | Value                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env`, Vercel env (Preview and Production) | `pk_test_…` (dev instance) or `pk_live_…` (prod instance)                                                                       |
+| `CLERK_ISSUER`               | `api/.env` locally and on the VPS                    | Clerk Frontend API URL, dev: `https://simple-cicada-2857.clerk.accounts.dev`, prod: `https://clerk.rehab-cdss.notetaker.uk`     |
+| `CDSS_ALLOWED_ORIGINS`       | `api/.env` on the VPS                                | dev: `https://dev-rehab-cdss.notetaker.uk`, prod: `https://rehab-cdss.notetaker.uk`. The API rejects tokens from other origins. |
 
 To add a user:
 
@@ -49,19 +49,65 @@ To add a user:
 
 A user without a role can sign in, but the API returns 403.
 
+## Database
+
+The API keeps jobs in Postgres 16, in the `cdss` schema. See [ADR-04](docs/adr/ADR-04-jobs-postgres.md).
+Report files stay in `data/reports/`; the `jobs` table keeps their paths.
+
+| Environment | Database                             | `DATABASE_URL`                                  |
+| ----------- | ------------------------------------ | ----------------------------------------------- |
+| Local       | Docker, `127.0.0.1:5432` (see below) | `postgresql://rehab:rehab@127.0.0.1:5432/rehab` |
+| Dev server  | Supabase project `rehab-cdss-dev`    | Supabase → Connect → Session pooler             |
+| Prod server | Supabase project `rehab-cdss-prod`   | Supabase → Connect → Session pooler             |
+| CI          | Postgres 16 service container        | set by the workflow                             |
+
+Start the local Postgres once. Later, start it again with `docker start rehab-cdss-db`:
+
+```bash
+docker run -d --name rehab-cdss-db -e POSTGRES_USER=rehab -e POSTGRES_PASSWORD=rehab -e POSTGRES_DB=rehab -p 127.0.0.1:5432:5432 -v rehab-cdss-db:/var/lib/postgresql/data postgres:16
+```
+
+The container runs `alembic upgrade head` before the API starts.
+Locally, apply the migrations from `api/` before you start the API:
+
+```bash
+uv run --env-file .env alembic upgrade head
+```
+
+To add a migration, change `api/src/api/db.py`, then run from `api/`:
+
+```bash
+uv run --env-file .env alembic revision --autogenerate -m "short description"
+```
+
+At startup the API marks jobs that a restart interrupted as failed.
+
 ## DNS
 
 The zone `notetaker.uk` is on Cloudflare. All records for this project use the `rehab-cdss` suffix.
 
-| Type  | Name                 | Value                                 | Proxy    | Purpose                              | Link                                    |
-| ----- | -------------------- | ------------------------------------- | -------- | ------------------------------------ | --------------------------------------- |
+| Type  | Name                 | Value                                 | Proxy    | Purpose                              | Link                                      |
+| ----- | -------------------- | ------------------------------------- | -------- | ------------------------------------ | ----------------------------------------- |
 | A     | `api-rehab-cdss`     | `<VPS_IP>`                            | Proxied  | API, prod (`main`)                   | <https://api-rehab-cdss.notetaker.uk>     |
 | A     | `api-dev-rehab-cdss` | `<VPS_IP>`                            | Proxied  | API, dev (`dev`)                     | <https://api-dev-rehab-cdss.notetaker.uk> |
 | CNAME | `rehab-cdss`         | `864832b82e884f30.vercel-dns-017.com` | DNS only | Frontend, Vercel Production (`main`) | <https://rehab-cdss.notetaker.uk>         |
 | CNAME | `dev-rehab-cdss`     | `864832b82e884f30.vercel-dns-017.com` | DNS only | Frontend, Vercel Preview (`dev`)     | <https://dev-rehab-cdss.notetaker.uk>     |
 
 Frontend records must be **DNS only**, so that Vercel can issue the TLS certificate. The CNAME target is the project-specific value from *Project → Settings → Domains*; `cname.vercel-dns.com` also works as a fallback.
->
+
+The Clerk production instance is a secondary application on `rehab-cdss.notetaker.uk`. It needs these records:
+
+| Type  | Name                         | Value                         | Proxy    | Purpose                             |
+| ----- | ---------------------------- | ----------------------------- | -------- | ----------------------------------- |
+| CNAME | `clerk.rehab-cdss`           | `frontend-api.clerk.services` | DNS only | Clerk Frontend API (`CLERK_ISSUER`) |
+| CNAME | `accounts.rehab-cdss`        | `accounts.clerk.services`     | DNS only | Clerk Account Portal                |
+| CNAME | `clkmail.rehab-cdss`         | `mail.<id>.clerk.services`    | DNS only | Clerk email sending                 |
+| CNAME | `clk._domainkey.rehab-cdss`  | `dkim1.<id>.clerk.services`   | DNS only | Clerk email DKIM                    |
+| CNAME | `clk2._domainkey.rehab-cdss` | `dkim2.<id>.clerk.services`   | DNS only | Clerk email DKIM                    |
+
+Copy the exact values from Clerk Dashboard → Production → *Configure → Domains*. `<id>` is specific to the instance.
+Clerk records must be **DNS only**. Clerk does not verify proxied records and cannot issue its certificates.
+The dev Clerk instance (`*.clerk.accounts.dev`) needs no DNS records.
 
 ## Deploy notifications
 

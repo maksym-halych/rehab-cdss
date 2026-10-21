@@ -39,11 +39,24 @@ The test and build checks need no clinic package, real patient data or provider 
 - Retrieval: metadata exclusions, empty results and ordering of protocol sections.
 - Module 2: synthetic JSON through the real LangGraph pipeline, Markdown renderer and DOCX exporter.
 - JSON API: upload, form overrides, background processing, status polling, report downloads and existing input/size rejection rules.
+- Job store: save, update, list, delete, jobs after a restart, and failing jobs that a restart interrupted (SQLite).
+- Migrations on Postgres 16: upgrade on an empty database, downgrade and upgrade again, check constraints and the primary key.
 - Patient identity fields are excluded from the report-generation prompt. Tests check that synthetic identity sentinels do not reach LLM prompts or output reports.
 
 Deterministic substitutes replace LLM responses and knowledge-base searches.
 Tests do not use a live ChromaDB or paid LLM requests.
 Network sockets are blocked; API tests allow only loopback addresses for Windows asyncio.
+API and job store tests use a temporary SQLite file with the same tables.
+The migration tests need Postgres and run only when `TEST_DATABASE_URL` is set.
+CI starts an empty Postgres 16 for them.
+They drop the `cdss` tables, so never point `TEST_DATABASE_URL` at a database with data you need.
+To run them locally on a separate database:
+
+```bash
+docker exec rehab-cdss-db createdb -U rehab rehab_test
+cd api && TEST_DATABASE_URL=postgresql://rehab:rehab@127.0.0.1:5432/rehab_test uv run pytest tests/test_migrations.py
+```
+
 Free-text de-identification remains a separate E2.6 task.
 
 Coverage includes all Python source under `api/src/`.
@@ -60,7 +73,7 @@ The Windows event loop also needs permission to create a local socket pair.
 The CI workflow runs on pull requests into `dev` and `main`:
 
 1. Ruff checks backend source, tests and scripts.
-2. Pytest runs the offline checks and saves the `backend-coverage` artifact.
+2. Pytest runs the offline checks and the Postgres migration tests, and saves the `backend-coverage` artifact.
 3. Docker builds the API image from `api/`.
 4. ESLint, TypeScript and Vite check and build the frontend.
 

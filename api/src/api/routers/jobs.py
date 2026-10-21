@@ -6,7 +6,7 @@ import asyncio
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from ..dependencies import get_current_user, get_job_store
+from ..dependencies import CurrentUser, get_current_user, get_job_store
 from ..services.file_service import save_uploads
 from ..models.jobs import Job, JobStatus, Module2Status
 from ..services.job_store import JobStore
@@ -105,6 +105,7 @@ async def create_job(
     pushup_type_overrides: str = Form(default="{}"),
     manual_test_overrides: str = Form(default="{}"),
     job_store: JobStore = Depends(get_job_store),
+    user: CurrentUser = Depends(get_current_user),
 ) -> JobCreatedResponse:
     # Validate activity level
     if activity_level not in ALLOWED_ACTIVITY_LEVELS:
@@ -149,7 +150,7 @@ async def create_job(
         )
 
     # Create job
-    job = await job_store.create()
+    job = await job_store.create(created_by=user.user_id)
 
     # Save uploads to disk
     try:
@@ -216,6 +217,7 @@ async def create_job_from_json(
     manual_person_name: str = Form(default=""),
     patient_code: str = Form(default=""),
     job_store: JobStore = Depends(get_job_store),
+    user: CurrentUser = Depends(get_current_user),
 ) -> JobCreatedResponse:
     """Run Module 2 directly on an uploaded Module 1 JSON export (skips Module 1).
 
@@ -271,7 +273,7 @@ async def create_job_from_json(
     patient_info.update({k: v for k, v in overrides.items() if v not in (None, "")})
     data["patient_info"] = patient_info
 
-    job = await job_store.create()
+    job = await job_store.create(created_by=user.user_id)
     job_dir = REPORTS_ROOT / job.job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     json_path = job_dir / "module1_export.json"

@@ -37,6 +37,23 @@ jobs:
     defaults:
       run:
         working-directory: api
+    # Empty Postgres 16 (the Supabase version) for the migration and constraint tests
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rehab
+          POSTGRES_PASSWORD: rehab
+          POSTGRES_DB: rehab_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rehab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://rehab:rehab@127.0.0.1:5432/rehab_test
     steps:
       - uses: actions/checkout@v4
 

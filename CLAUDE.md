@@ -16,8 +16,8 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 
 | Path                          | Content                                                                 |
 | ----------------------------- | ----------------------------------------------------------------------- |
-| `api/`                        | Python backend: `pyproject.toml`, `uv.lock`, `Dockerfile`, `.env`       |
-| `api/src/api/`                | FastAPI app. Routers, services, in-memory `JobStore`                    |
+| `api/`                        | Python backend: `pyproject.toml`, `uv.lock`, `Dockerfile`, `.env`, Alembic `migrations/` |
+| `api/src/api/`                | FastAPI app. Routers, services, `JobStore` on Postgres (`db.py`)        |
 | `api/src/module_2_reasoning/` | LangGraph nodes, filter, retrieval, embeddings, report export, paths    |
 | `scripts/`                    | Repo tools: `ingest/` (steps 1–4 that build `data/`), `demo/`, `module2/` |
 | `frontend/`                   | React 19 + TypeScript + Vite + Zustand                                  |
@@ -28,6 +28,8 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 
 ```bash
 make                                                             # list shortcuts: pre-commit, api, frontend
+docker start rehab-cdss-db                                       # local Postgres 16 on 127.0.0.1:5432 (first run: README, Database)
+cd api && uv run --env-file .env alembic upgrade head            # apply migrations
 cd api && uv sync                                                # Python 3.12 only
 cd api && uv run --env-file .env rehab-api                       # API on :8000, docs on /api/docs
 cd api && uv run ruff check src
@@ -49,6 +51,7 @@ uv run --project api pre-commit run --all-files
 
 - Copy `api/.env.example` to `api/.env`. Do not commit `.env`.
 - `DIPLOMA_API_KEY` is the Gemini key.
+- `DATABASE_URL` is the Postgres URL. Locally it is the `rehab-cdss-db` Docker container. On the servers it is the Supabase Session pooler URL (dev and prod are separate Supabase projects).
 - Copy `frontend/.env.example` to `frontend/.env`. It has the Clerk publishable key for the dev instance.
 - The embedding provider and model must be the same as the ones that built `data/chromadb/`. If you change them, delete `data/chromadb/` and run the ingest again.
 - The free Gemini tier gives 20 requests per day per model. Do not run full pipelines without need.
@@ -58,7 +61,8 @@ uv run --project api pre-commit run --all-files
 - A push to `dev` deploys the dev environment. A push to `main` deploys prod.
 - API: GitHub Actions → VPS → `docker compose --env-file api/.env up --build`. The `--env-file` flag gives `HOST_PORT` to the port mapping. Frontend: GitHub Actions → Vercel.
 - `docker-compose.yaml` is the server setup. Do not change its ports or project names for local use.
-- The API runs with one worker, because `JobStore` keeps jobs in memory.
+- The API runs with one worker. Pipelines run in the API process, and at startup the API fails the jobs that a restart interrupted.
+- The container runs `alembic upgrade head` before the API starts.
 
 ## Rules for personal data (NFR-01)
 
@@ -73,6 +77,7 @@ uv run --project api pre-commit run --all-files
 - Read the issue before you start. Do its acceptance criteria and its "Стан на" notes. Do not do work again that a merged PR already did.
 - Status flow: Backlog → To Do → In Progress → Review → Done.
 - Branch: `feat/<short-name>` from `dev`. PR target: `dev`. PR body has `Closes #<issue>`.
+- Do not add or change `make` commands unless the user asks. The Makefile is the user's own shortcuts.
 - Commits: Conventional Commits, for example `feat(jobs): run module 2 from json`.
 - PR descriptions: ASD-STE100. One sentence or one list item per line.
 - No Claude attribution in commits or PRs.
@@ -93,3 +98,5 @@ uv run --project api pre-commit run --all-files
 - The API accepts only a Clerk session token (`Authorization: Bearer`). `api.dependencies.get_current_user` checks it and returns the Clerk user ID and the role. `/api/v1/health` is public.
 - The role (`doctor` or `admin`) is in the Clerk user's public metadata. A session token template copies it into the `role` claim. A user without a role gets 403.
 - The API does not start without `CLERK_ISSUER`.
+- Jobs are in Postgres, table `cdss.jobs` (ADR-04). Only this table for now. Add patients, reports or audit tables when a feature needs them. Use the `cdss` schema, not `public`.
+- Change the schema only with an Alembic migration. Do not edit an applied migration.

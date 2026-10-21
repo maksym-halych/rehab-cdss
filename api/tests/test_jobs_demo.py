@@ -13,7 +13,7 @@ pytestmark = pytest.mark.allow_hosts(["127.0.0.1", "::1"])
 
 
 @pytest.fixture
-def client(monkeypatch, tmp_path):
+def client(monkeypatch, tmp_path, database_url):
     import langchain_openai
     from api import dependencies
     from api.app import create_app

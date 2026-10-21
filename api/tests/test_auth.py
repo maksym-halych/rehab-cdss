@@ -34,7 +34,7 @@ def make_token(key=_KEY, **overrides):
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, database_url):
     from api import dependencies
     from api.app import create_app
 
@@ -111,4 +111,12 @@ def test_api_does_not_start_without_clerk_issuer():
     from api.app import create_app
 
     with pytest.raises(RuntimeError, match="CLERK_ISSUER"):
+        create_app()
+
+
+def test_api_does_not_start_without_database_url(monkeypatch):
+    from api.app import create_app
+
+    monkeypatch.setenv("CLERK_ISSUER", ISSUER)
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
         create_app()

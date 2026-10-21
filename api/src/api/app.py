@@ -5,8 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import health, files, jobs, reports, patients
 from .routers import config as cfg_router
+from .db import create_engine
 from .services.job_store import JobStore
-from .settings import allowed_origins, clerk_issuer
+from .settings import allowed_origins, clerk_issuer, database_url
 
 
 def _configure_cors(app: FastAPI) -> None:
@@ -22,7 +23,8 @@ def _configure_cors(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    job_store = JobStore()
+    job_store = JobStore(create_engine(database_url()))
+    await job_store.fail_unfinished()
     app.state.job_store = job_store
     yield
     await job_store.shutdown()
@@ -32,6 +34,9 @@ def create_app() -> FastAPI:
     # Every route except health needs a Clerk token, so the API does not start without Clerk
     if not clerk_issuer():
         raise RuntimeError("CLERK_ISSUER is not set. See api/.env.example")
+    # Jobs are kept in Postgres (Supabase on the servers)
+    if not database_url():
+        raise RuntimeError("DATABASE_URL is not set. See api/.env.example")
     app = FastAPI(
         title="Rehab CDSS API",
         version="1.0.0",

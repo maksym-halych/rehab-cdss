@@ -5,6 +5,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .models.jobs import Job
 from .services.job_store import JobStore
 from .settings import allowed_origins, clerk_issuer
 
@@ -17,6 +18,10 @@ _bearer = HTTPBearer(auto_error=False)
 class CurrentUser:
     user_id: str  # Clerk user ID (the token "sub")
     role: str
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
 
 
 @lru_cache(maxsize=4)
@@ -75,3 +80,19 @@ def get_current_user(
 
 def get_job_store(request: Request) -> JobStore:
     return request.app.state.job_store
+
+
+async def get_owned_job(
+    job_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    job_store: JobStore = Depends(get_job_store),
+) -> Job:
+    """The job from the path. A doctor gets only own jobs; an admin gets all jobs."""
+    job = await job_store.get(job_id)
+    # 404, not 403: the API does not tell whether another user's job exists
+    if job is None or (job.created_by != user.user_id and not user.is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
+        )
+    return job

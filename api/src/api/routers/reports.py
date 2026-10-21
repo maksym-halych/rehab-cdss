@@ -4,9 +4,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from ..dependencies import get_current_user, get_job_store
-from ..models.jobs import JobStatus, Module2Status
-from ..services.job_store import JobStore
+from ..dependencies import get_current_user, get_owned_job
+from ..models.jobs import Job, JobStatus, Module2Status
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -14,14 +13,8 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 @router.get("/reports/{job_id}/json")
 async def get_report_json(
     job_id: str,
-    job_store: JobStore = Depends(get_job_store),
+    job: Job = Depends(get_owned_job),
 ):
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     if job.status != JobStatus.COMPLETED:
         raise HTTPException(
             status_code=409,
@@ -46,14 +39,8 @@ async def get_report_json(
 @router.get("/reports/{job_id}/docx")
 async def get_report_docx(
     job_id: str,
-    job_store: JobStore = Depends(get_job_store),
+    job: Job = Depends(get_owned_job),
 ):
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     if job.status != JobStatus.COMPLETED:
         raise HTTPException(
             status_code=409,
@@ -77,15 +64,9 @@ async def get_report_docx(
 @router.get("/reports/{job_id}/rehab-report")
 async def get_rehab_report_md(
     job_id: str,
-    job_store: JobStore = Depends(get_job_store),
+    job: Job = Depends(get_owned_job),
 ):
     """Return the Module 2 rehabilitation report as plain text markdown."""
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     if job.module2_status != Module2Status.COMPLETED:
         raise HTTPException(
             status_code=409,
@@ -109,15 +90,9 @@ async def get_rehab_report_md(
 @router.get("/reports/{job_id}/rehab-report/docx")
 async def get_rehab_report_docx(
     job_id: str,
-    job_store: JobStore = Depends(get_job_store),
+    job: Job = Depends(get_owned_job),
 ):
     """Download the Module 2 rehabilitation report as DOCX."""
-    job = await job_store.get(job_id)
-    if not job:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "JOB_NOT_FOUND", "message": f"Job {job_id} does not exist"},
-        )
     if job.module2_status != Module2Status.COMPLETED:
         raise HTTPException(
             status_code=409,

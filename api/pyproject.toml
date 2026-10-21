@@ -12,14 +12,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "gradio==5.34.2",
     "langchain-openai>=0.2.0",
     "pydantic>=2.0",
-    "matplotlib==3.8.4",
-    "numpy==1.26.4",
-    "pdfplumber==0.11.4",
-    "pillow==10.4.0",
-    "pymupdf==1.24.10",
     "pypdf==4.3.1",
     "python-docx==1.1.2",
     "requests>=2.32.5",
@@ -34,6 +28,9 @@ dependencies = [
 ]
 
 [project.scripts]
-rehab-start = "ui.app:launch_app"
 rehab-api = "api.app:launch_api"
-rehab-all = "api.app:launch_all"
+
+[dependency-groups]
+dev = [
+    "ruff==0.15.4",
+]

@@ -19,7 +19,6 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 | `api/`                        | Python backend: `pyproject.toml`, `uv.lock`, `Dockerfile`, `.env`       |
 | `api/src/api/`                | FastAPI app. Routers, services, in-memory `JobStore`                    |
 | `api/src/module_2_reasoning/` | LangGraph nodes, filter, retrieval, embeddings, report export, paths    |
-| `api/src/ui/`                 | Old Gradio UI. Do not change it. Task E1.2 removes it                   |
 | `scripts/`                    | Repo tools: `ingest/` (steps 1–4 that build `data/`), `demo/`, `module2/` |
 | `frontend/`                   | React 19 + TypeScript + Vite + Zustand                                  |
 | `data/`                       | Git-ignored. ChromaDB, knowledge base, reports, JSON exports            |

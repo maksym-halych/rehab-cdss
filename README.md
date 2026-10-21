@@ -29,3 +29,9 @@ The zone `notetaker.uk` is on Cloudflare. All records for this project use the `
 
 Frontend records must be **DNS only**, so that Vercel can issue the TLS certificate. The CNAME target is the project-specific value from *Project → Settings → Domains*; `cname.vercel-dns.com` also works as a fallback.
 >
+
+## Deploy notifications
+
+Both deploy workflows send the result to a Telegram chat: status, branch, the user, the merged PR and a link to the run.
+Repository secrets: `TELEGRAM_BOT_TOKEN` (from @BotFather) and `TELEGRAM_CHAT_ID` (the group ID is negative).
+Without these secrets, the deploy runs as usual and only writes a warning.

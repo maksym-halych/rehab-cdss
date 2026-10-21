@@ -1,0 +1,70 @@
+name: Telegram deploy notification
+description: Send the deploy result, the user, the branch and the merged PR to a Telegram chat
+
+inputs:
+  target:
+    description: What was deployed, for example API or Frontend
+    required: true
+  status:
+    description: job.status of the deploy job
+    required: true
+  bot-token:
+    required: true
+  chat-id:
+    required: true
+  github-token:
+    description: Token with pull-requests read access, to find the PR of the pushed commit
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        STATUS: ${{ inputs.status }}
+        BOT_TOKEN: ${{ inputs.bot-token }}
+        CHAT_ID: ${{ inputs.chat-id }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+        BRANCH: ${{ github.ref_name }}
+        ACTOR: ${{ github.actor }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+          echo "::warning::TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set, no notification sent"
+          exit 0
+        fi
+
+        esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
+        case "$STATUS" in
+          success) header="✅ <b>$TARGET deploy succeeded</b>" ;;
+          cancelled) header="⚪ <b>$TARGET deploy cancelled</b>" ;;
+          *) header="❌ <b>$TARGET deploy failed</b>" ;;
+        esac
+
+        # The PR that the pushed merge commit belongs to; empty for a direct push or a manual run
+        # gh api prints the error body to stdout on failure, so the output is used only on success
+        if ! pr=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[0] // empty | "\(.number)\t\(.html_url)\t\(.title)"' 2>/dev/null); then
+          pr=""
+        fi
+        if [ -n "$pr" ]; then
+          IFS=$'\t' read -r pr_number pr_url pr_title <<< "$pr"
+          pr_line="PR: <a href=\"$pr_url\">#$pr_number</a> $(printf '%s' "$pr_title" | esc)"
+        else
+          pr_line="Commit: <a href=\"https://github.com/$REPO/commit/$SHA\">${SHA::7}</a> (no PR)"
+        fi
+
+        text="$header
+        Branch: <code>$(printf '%s' "$BRANCH" | esc)</code>
+        By: $(printf '%s' "$ACTOR" | esc)
+        $pr_line
+        <a href=\"$RUN_URL\">Workflow run</a>"
+
+        curl -sS --fail-with-body -o /dev/null -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+          --data-urlencode chat_id="$CHAT_ID" \
+          --data-urlencode parse_mode=HTML \
+          --data-urlencode disable_web_page_preview=true \
+          --data-urlencode text="$text"

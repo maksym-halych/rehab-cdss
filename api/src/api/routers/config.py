@@ -3,9 +3,9 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from ..dependencies import verify_api_key
+from ..dependencies import get_current_user
 
-router = APIRouter(dependencies=[Depends(verify_api_key)])
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 class TestTypeInfo(BaseModel):

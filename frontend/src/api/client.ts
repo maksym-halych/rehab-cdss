@@ -1,19 +1,32 @@
 import type { DetectFilesResponse, Job, ConfigResponse } from './types';
 
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
-const API_KEY = import.meta.env.VITE_API_KEY ?? '';
+// Set by AuthGate: the Clerk session token getter and the handler for 401/403 responses
+let getToken: () => Promise<string | null> = async () => null;
+let onAuthError: (status: 401 | 403) => void = () => {};
 
-function headers(extra: Record<string, string> = {}): Record<string, string> {
-  const h: Record<string, string> = { ...extra };
-  if (API_KEY) h['X-API-Key'] = API_KEY;
-  return h;
+export function configureAuth(options: {
+  getToken: () => Promise<string | null>;
+  onAuthError: (status: 401 | 403) => void;
+}): void {
+  getToken = options.getToken;
+  onAuthError = options.onAuthError;
+}
+
+async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  // Clerk tokens live 60 s; getToken returns a cached token or refreshes it
+  const token = await getToken();
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(url, { ...init, headers });
+  if (res.status === 401 || res.status === 403) onAuthError(res.status);
+  return res;
 }
 
 export async function detectFiles(files: File[], manualPersonName?: string): Promise<DetectFilesResponse> {
   const fd = new FormData();
   files.forEach(f => fd.append('files', f, f.name));
   if (manualPersonName) fd.append('manual_person_name', manualPersonName);
-  const res = await fetch(`${BASE}/api/v1/files/detect`, { method: 'POST', headers: headers(), body: fd });
+  const res = await apiFetch(`${BASE}/api/v1/files/detect`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -39,7 +52,7 @@ export async function submitJob(params: {
   fd.append('patient_code', params.patientCode);
   fd.append('pushup_type_overrides', JSON.stringify(params.pushupTypeOverrides));
   fd.append('manual_test_overrides', JSON.stringify(params.manualTestOverrides));
-  const res = await fetch(`${BASE}/api/v1/jobs`, { method: 'POST', headers: headers(), body: fd });
+  const res = await apiFetch(`${BASE}/api/v1/jobs`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -59,67 +72,52 @@ export async function submitJsonJob(params: {
   fd.append('activity_level', params.activityLevel);
   fd.append('manual_person_name', params.manualPersonName);
   fd.append('patient_code', params.patientCode);
-  const res = await fetch(`${BASE}/api/v1/jobs/from-json`, { method: 'POST', headers: headers(), body: fd });
+  const res = await apiFetch(`${BASE}/api/v1/jobs/from-json`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getJob(jobId: string): Promise<Job> {
-  const res = await fetch(`${BASE}/api/v1/jobs/${jobId}`, { headers: headers() });
+  const res = await apiFetch(`${BASE}/api/v1/jobs/${jobId}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function getConfig(): Promise<ConfigResponse> {
-  const res = await fetch(`${BASE}/api/v1/config/test-types`, { headers: headers() });
+  const res = await apiFetch(`${BASE}/api/v1/config/test-types`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export function getDocxUrl(jobId: string): string {
-  return `${BASE}/api/v1/reports/${jobId}/docx`;
-}
-
-export async function downloadDocxReport(jobId: string): Promise<void> {
-  const url = getDocxUrl(jobId);
+// A plain link cannot send the Bearer token, so the file is fetched and saved as a blob
+async function downloadFile(url: string, fileName: string): Promise<void> {
   try {
-    const res = await fetch(url, { headers: headers() });
+    const res = await apiFetch(url);
     if (!res.ok) throw new Error('Download failed');
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(await res.blob());
     const a = document.createElement('a');
     a.href = objectUrl;
-    a.download = `report_${jobId.slice(0, 8)}.docx`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(objectUrl);
   } catch {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.alert('Не вдалося завантажити звіт');
   }
 }
 
+export function downloadDocxReport(jobId: string): Promise<void> {
+  return downloadFile(`${BASE}/api/v1/reports/${jobId}/docx`, `report_${jobId.slice(0, 8)}.docx`);
+}
+
 export async function getRehabReport(jobId: string): Promise<string> {
-  const res = await fetch(`${BASE}/api/v1/reports/${jobId}/rehab-report`, { headers: headers() });
+  const res = await apiFetch(`${BASE}/api/v1/reports/${jobId}/rehab-report`);
   if (!res.ok) throw new Error(await res.text());
   return res.text();
 }
 
-export function getRehabDocxUrl(jobId: string): string {
-  return `${BASE}/api/v1/reports/${jobId}/rehab-report/docx`;
-}
-
-export async function downloadRehabDocx(jobId: string): Promise<void> {
-  const url = getRehabDocxUrl(jobId);
-  try {
-    const res = await fetch(url, { headers: headers() });
-    if (!res.ok) throw new Error('Download failed');
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = `rehabilitation_report_${jobId.slice(0, 8)}.docx`;
-    a.click();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
+export function downloadRehabDocx(jobId: string): Promise<void> {
+  return downloadFile(
+    `${BASE}/api/v1/reports/${jobId}/rehab-report/docx`,
+    `rehabilitation_report_${jobId.slice(0, 8)}.docx`,
+  );
 }

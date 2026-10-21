@@ -9,6 +9,12 @@
   width: 100%;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .appName {
   font-size: var(--text-xl);
   font-weight: var(--font-weight-bold);

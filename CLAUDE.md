@@ -48,7 +48,8 @@ uv run --project api pre-commit run --all-files
 ## Configuration
 
 - Copy `api/.env.example` to `api/.env`. Do not commit `.env`.
-- `DIPLOMA_API_KEY` is the Gemini key. `CDSS_API_KEYS` empty means the API accepts all requests.
+- `DIPLOMA_API_KEY` is the Gemini key.
+- Copy `frontend/.env.example` to `frontend/.env`. It has the Clerk publishable key for the dev instance.
 - The embedding provider and model must be the same as the ones that built `data/chromadb/`. If you change them, delete `data/chromadb/` and run the ingest again.
 - The free Gemini tier gives 20 requests per day per model. Do not run full pipelines without need.
 
@@ -87,5 +88,8 @@ uv run --project api pre-commit run --all-files
 ## Decisions
 
 - Architecture: modular monolith (ADR-01). Do not split it into services.
-- v2.0 adds PostgreSQL + SQLAlchemy + Alembic, OAuth2/JWT with roles, an audit log, and de-identification before the LLM.
-- Open question: OAuth2/JWT (presentation) or Clerk. Get agreement before you start E2.
+- v2.0 adds PostgreSQL + SQLAlchemy + Alembic, Clerk sign-in with roles, an audit log, and de-identification before the LLM.
+- Authentication is Clerk (ADR-03, `docs/adr/ADR-03-auth-clerk.md`). Sign-up is invite-only. Clerk stores the users and passwords; there is no users table.
+- The API accepts only a Clerk session token (`Authorization: Bearer`). `api.dependencies.get_current_user` checks it and returns the Clerk user ID and the role. `/api/v1/health` is public.
+- The role (`doctor` or `admin`) is in the Clerk user's public metadata. A session token template copies it into the `role` claim. A user without a role gets 403.
+- The API does not start without `CLERK_ISSUER`.

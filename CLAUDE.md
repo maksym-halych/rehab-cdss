@@ -41,8 +41,9 @@ uv run --project api pre-commit run --all-files
 
 - Run API commands in `api/`. Run `scripts/` from the root with `uv run --project api`, so they use the `api/` environment.
 - Code in `api/src/` finds `data/` through `module_2_reasoning.paths.DATA_DIR`. Do not write paths relative to the working directory.
-- CI (`.github/workflows/ci.yml`) runs on each PR into `dev` and `main`: ruff, ESLint (warnings fail), and the frontend type check and build.
-- There are no automated tests yet. Task E6.2 adds them.
+- CI (`.github/workflows/ci.yml`) runs on each PR into `dev` and `main`: ruff, offline backend tests with coverage, ESLint (warnings fail), the frontend type check and build, and the API Docker build.
+- Run tests in `api/`: `uv run --locked pytest --cov --cov-report=html --cov-report=xml`. CI saves the `backend-coverage` artifact.
+- Module 1 integration is out of scope for the current work. Tests use synthetic JSON input and replace external LLM and retrieval calls. See `docs/testing.md`.
 
 ## Configuration
 
@@ -86,5 +87,5 @@ uv run --project api pre-commit run --all-files
 ## Decisions
 
 - Architecture: modular monolith (ADR-01). Do not split it into services.
-- v2.0 adds PostgreSQL + SQLAlchemy + Alembic, OAuth2/JWT with roles, an audit log, de-identification before the LLM, and a Module 1 adapter with real and mock modes.
+- v2.0 adds PostgreSQL + SQLAlchemy + Alembic, OAuth2/JWT with roles, an audit log, and de-identification before the LLM.
 - Open question: OAuth2/JWT (presentation) or Clerk. Get agreement before you start E2.

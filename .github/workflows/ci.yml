@@ -28,7 +28,46 @@ jobs:
 
       # Only the dev group (ruff, pre-commit): the lint does not need the backend dependencies
       - name: Ruff
-        run: uv run --project api --locked --only-group dev ruff check --output-format=github api/src scripts
+        run: uv run --project api --locked --only-group dev ruff check --output-format=github api/src api/tests scripts
+
+  api-tests:
+    name: API tests (offline providers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: api/uv.lock
+          python-version: '3.12'
+
+      - name: Unit tests and synthetic pipeline
+        run: uv run --locked pytest --cov --cov-fail-under=60 --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+
+      - name: Save coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            api/coverage.xml
+            api/htmlcov/
+          if-no-files-found: warn
+
+  api-docker:
+    name: API Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build --progress=plain --tag rehab-cdss:ci ./api
 
   frontend:
     name: Frontend lint and build

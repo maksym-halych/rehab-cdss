@@ -19,7 +19,7 @@ def isolate_environment(monkeypatch):
     """Tests must never use the developer's provider keys or tracing settings."""
     for name in tuple(os.environ):
         if (
-            name in {"DIPLOMA_API_KEY", "OPENAI_API_KEY", "CDSS_API_KEYS"}
+            name in {"DIPLOMA_API_KEY", "OPENAI_API_KEY", "CLERK_ISSUER", "CDSS_ALLOWED_ORIGINS"}
             or name.startswith("LANGCHAIN_")
             or name.startswith("LANGSMITH_")
         ):

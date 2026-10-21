@@ -4,11 +4,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from ..dependencies import get_job_store, verify_api_key
+from ..dependencies import get_current_user, get_job_store
 from ..models.jobs import JobStatus, Module2Status
 from ..services.job_store import JobStore
 
-router = APIRouter(dependencies=[Depends(verify_api_key)])
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/reports/{job_id}/json")

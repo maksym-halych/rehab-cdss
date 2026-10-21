@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { UserButton } from '@clerk/react';
 import { RehabLayout } from './components/layout/RehabLayout';
 import { FilesPanel } from './components/layout/FilesPanel';
 import { ParamsPanel } from './components/layout/ParamsPanel';
@@ -28,15 +29,18 @@ function AppHeader({ isDark, onToggleTheme }: { isDark: boolean; onToggleTheme: 
   return (
     <div className={styles.headerInner}>
       <span className={styles.appName}>Rehab CDSS</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        aria-label={isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
-        onClick={onToggleTheme}
-      >
-        {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
-      </Button>
+      <div className={styles.headerActions}>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-label={isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
+          onClick={onToggleTheme}
+        >
+          {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+        </Button>
+        <UserButton />
+      </div>
     </div>
   );
 }

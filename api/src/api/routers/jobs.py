@@ -6,14 +6,14 @@ import asyncio
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from ..dependencies import get_job_store, verify_api_key
+from ..dependencies import get_current_user, get_job_store
 from ..services.file_service import save_uploads
 from ..models.jobs import Job, JobStatus, Module2Status
 from ..services.job_store import JobStore
 from ..services.module2_service import REPORTS_ROOT, run_module2_async
 from ..services.pipeline_service import run_pipeline_async
 
-router = APIRouter(dependencies=[Depends(verify_api_key)])
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 ALLOWED_ACTIVITY_LEVELS = {"elite", "recreational", "low"}
 

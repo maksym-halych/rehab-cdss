@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,28 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import health, files, jobs, reports, patients
 from .routers import config as cfg_router
 from .services.job_store import JobStore
-
-_CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-]
-_env_origins = [
-    o.strip()
-    for o in os.getenv("CDSS_ALLOWED_ORIGINS", "").split(",")
-    if o.strip()
-]
-_ALL_ORIGINS = _CORS_ORIGINS + _env_origins
+from .settings import allowed_origins, clerk_issuer
 
 
 def _configure_cors(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_ALL_ORIGINS,
+        allow_origins=allowed_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Authorization", "X-API-Key", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type"],
         max_age=600,
     )
 
@@ -42,6 +29,9 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # Every route except health needs a Clerk token, so the API does not start without Clerk
+    if not clerk_issuer():
+        raise RuntimeError("CLERK_ISSUER is not set. See api/.env.example")
     app = FastAPI(
         title="Rehab CDSS API",
         version="1.0.0",

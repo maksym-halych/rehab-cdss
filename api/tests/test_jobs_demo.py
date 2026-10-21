@@ -21,7 +21,7 @@ def client(monkeypatch, tmp_path):
     from api.services import job_store, module2_service
     from module_2_reasoning import graph
 
-    monkeypatch.setattr(dependencies, "_VALID_KEYS", frozenset())
+    monkeypatch.setenv("CLERK_ISSUER", "https://clerk.example.test")
     monkeypatch.setenv("DIPLOMA_API_KEY", "synthetic-test-key")
     monkeypatch.setenv("EMBEDDING_PROVIDER", "gemini")
     monkeypatch.setattr(langchain_openai, "ChatOpenAI", FakeLLM)
@@ -37,7 +37,11 @@ def client(monkeypatch, tmp_path):
     with ThreadPoolExecutor(max_workers=2) as executor:
         for module in (job_store, module2_service):
             monkeypatch.setattr(module, "_EXECUTOR", executor)
-        with TestClient(create_app()) as http:
+        app = create_app()
+        app.dependency_overrides[dependencies.get_current_user] = lambda: (
+            dependencies.CurrentUser(user_id="user_test", role="doctor")
+        )
+        with TestClient(app) as http:
             yield http
 
 

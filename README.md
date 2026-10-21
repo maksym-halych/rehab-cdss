@@ -32,6 +32,23 @@ Run backend tests from `api/` with `uv run --locked pytest --cov --cov-report=ht
 CI saves the reports in the `backend-coverage` artifact.
 See [backend tests and CI](docs/testing.md) for local checks and the synthetic JSON scenario.
 
+## Authentication
+
+Users sign in with Clerk. Sign-up is invite-only. See [ADR-03](docs/adr/ADR-03-auth-clerk.md).
+
+| Setting | Where | Value |
+| --- | --- | --- |
+| `VITE_CLERK_PUBLISHABLE_KEY` | `frontend/.env`, Vercel env (Preview and Production) | `pk_test_…` (dev instance) or `pk_live_…` (prod instance) |
+| `CLERK_ISSUER` | `api/.env` locally and on the VPS | Clerk Frontend API URL, for example `https://simple-cicada-2857.clerk.accounts.dev` |
+| `CDSS_ALLOWED_ORIGINS` | `api/.env` on the VPS | The frontend URL. The API rejects tokens from other origins. |
+
+To add a user:
+
+1. In the Clerk Dashboard, open Users and invite the user, or use Create user.
+2. Open the user and set the public metadata to `{"role": "doctor"}` or `{"role": "admin"}`.
+
+A user without a role can sign in, but the API returns 403.
+
 ## DNS
 
 The zone `notetaker.uk` is on Cloudflare. All records for this project use the `rehab-cdss` suffix.

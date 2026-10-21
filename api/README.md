@@ -15,8 +15,12 @@ uv run ruff check src
 | -------------------------- | -------------------------------------------------------- |
 | `src/api/`                 | FastAPI app. Routers, services, in-memory `JobStore`     |
 | `src/module_2_reasoning/`  | LangGraph nodes, filter, retrieval, embeddings, export   |
+| `tests/`                  | Offline unit tests and synthetic API/pipeline checks |
 
 The data folder is `data/` in the repository root, outside `api/`.
 In Docker it is `/data`. `docker-compose.yaml` mounts it there.
 
 The scripts in the root `scripts/` folder use this environment: `uv run --project api python scripts/...`.
+
+Run tests with `uv run --locked pytest --cov --cov-report=html --cov-report=xml`.
+See [backend tests and CI](../docs/testing.md) for the synthetic JSON scenario and coverage reports.

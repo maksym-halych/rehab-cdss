@@ -18,7 +18,7 @@ My bachelor's thesis project — a Clinical Decision Support System (CDSS) for p
 
 ## Checks
 
-CI runs ruff, ESLint and the frontend build on each pull request.
+CI runs ruff, offline backend tests with coverage, ESLint, the frontend build and the API Docker build on each pull request.
 Run the same checks before each commit with [pre-commit](https://pre-commit.com):
 
 ```bash
@@ -27,6 +27,10 @@ make pre-commit                                  # all hooks on all files
 ```
 
 `make` lists the other shortcuts: `make api` (API on :8000), `make frontend` (UI on :3000).
+
+Run backend tests from `api/` with `uv run --locked pytest --cov --cov-report=html --cov-report=xml`.
+CI saves the reports in the `backend-coverage` artifact.
+See [backend tests and CI](docs/testing.md) for local checks and the synthetic JSON scenario.
 
 ## DNS
 

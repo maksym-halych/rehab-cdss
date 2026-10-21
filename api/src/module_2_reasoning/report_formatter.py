@@ -191,7 +191,11 @@ def generate_english_report(
         indent=2,
     )
     plan_json = json.dumps(enriched_plan or {}, ensure_ascii=False, indent=2)
-    patient_json = json.dumps(patient_info, ensure_ascii=False, indent=2)
+    patient_json = json.dumps(
+        {key: patient_info[key] for key in ("age", "gender", "activity_level") if key in patient_info},
+        ensure_ascii=False,
+        indent=2,
+    )
 
     prompt = ENGLISH_REPORT_PROMPT.format(
         patient_info_json=patient_json,

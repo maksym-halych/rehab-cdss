@@ -20,7 +20,7 @@ def _flag_row(row: dict) -> list[FlaggedParameter]:
     flagged: list[FlaggedParameter] = []
 
     # --- rows with a single 'value' ---
-    if "value" in row:
+    if row.get("value") is not None:
         value = row["value"]
 
         if norm:
@@ -119,7 +119,7 @@ def _flag_row(row: dict) -> list[FlaggedParameter]:
                             fp.asymmetry_norm_max = asym_norm_max
 
         # If no norm and no asymmetry violation — include as no_norm
-        if not flagged and norm is None:
+        if not flagged and not norm and (left is not None or right is not None):
             flagged.append(
                 FlaggedParameter(
                     parameter=parameter,
@@ -147,7 +147,7 @@ def filter_test_result(test_result: dict) -> FilteredTestResult:
 
     for table in tables:
         for row in table.get("rows", []):
-            if row.get("norm"):
+            if row.get("norm") or row.get("asymmetry_norm_max") is not None:
                 has_norm_data = True
             flagged_params.extend(_flag_row(row))
 

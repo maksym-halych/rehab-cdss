@@ -10,7 +10,7 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 - Module 1 parses device files (PDF, CSV) into a JSON export. Module 1 belongs to the clinic. It is NOT in this repository and NOT installed.
 - Module 2 (`api/src/module_2_reasoning/`) is a LangGraph pipeline. It reads the Module 1 JSON and makes a bilingual report (Markdown, DOCX).
 - Module 2 uses RAG: ChromaDB with 229 protocols and 1923 exercises. Gemini is the chat model.
-- Without Module 1, use JSON mode: `scripts/demo/generate_module1_json.py` makes synthetic exports, and `POST /api/v1/jobs/from-json` runs Module 2.
+- Without Module 1, use JSON mode: `GET /api/v1/demo/module1-json` (the "Демо JSON" button in the UI) makes a synthetic export, and `POST /api/v1/jobs/from-json` runs Module 2.
 
 ## Layout
 
@@ -19,7 +19,7 @@ Team 3 develops version 2.0 (Lviv Polytechnic course project, 2026).
 | `api/`                        | Python backend: `pyproject.toml`, `uv.lock`, `Dockerfile`, `.env`, Alembic `migrations/` |
 | `api/src/api/`                | FastAPI app. Routers, services, `JobStore` on Postgres (`db.py`)        |
 | `api/src/module_2_reasoning/` | LangGraph nodes, filter, retrieval, embeddings, report export, paths    |
-| `scripts/`                    | Repo tools: `ingest/` (steps 1–4 that build `data/`), `demo/`, `module2/` |
+| `scripts/`                    | Repo tools: `ingest/` (steps 1–4 that build `data/`), `module2/`         |
 | `frontend/`                   | React 19 + TypeScript + Vite + Zustand                                  |
 | `data/`                       | Git-ignored. ChromaDB, knowledge base, reports, JSON exports            |
 | Root files                    | `docker-compose.yaml`, CI workflows, docs                               |
@@ -33,7 +33,6 @@ cd api && uv run --env-file .env alembic upgrade head            # apply migrati
 cd api && uv sync                                                # Python 3.12 only
 cd api && uv run --env-file .env rehab-api                       # API on :8000, docs on /api/docs
 cd api && uv run ruff check src
-uv run --project api python scripts/demo/generate_module1_json.py --scenario acl_left
 uv run --project api ruff check scripts
 cd frontend && npm install && npm run dev                        # UI on :3000
 cd frontend && npm run build && npm run lint

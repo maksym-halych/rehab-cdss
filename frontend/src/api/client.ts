@@ -97,19 +97,34 @@ export async function getConfig(): Promise<ConfigResponse> {
 }
 
 // A plain link cannot send the Bearer token, so the file is fetched and saved as a blob
-async function downloadFile(url: string, fileName: string): Promise<void> {
+async function downloadFile(
+  url: string,
+  fileName: string,
+  errorMessage = 'Не вдалося завантажити звіт',
+): Promise<void> {
   try {
     const res = await apiFetch(url);
     if (!res.ok) throw new Error('Download failed');
+    // The API can name the file in Content-Disposition
+    const serverName = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1];
     const objectUrl = URL.createObjectURL(await res.blob());
     const a = document.createElement('a');
     a.href = objectUrl;
-    a.download = fileName;
+    a.download = serverName ?? fileName;
     a.click();
     URL.revokeObjectURL(objectUrl);
   } catch {
-    window.alert('Не вдалося завантажити звіт');
+    window.alert(errorMessage);
   }
+}
+
+// A random synthetic Module 1 export (fictional patient) to upload in JSON mode
+export function downloadDemoJson(): Promise<void> {
+  return downloadFile(
+    `${BASE}/api/v1/demo/module1-json`,
+    'synthetic_module1.json',
+    'Не вдалося створити демо JSON',
+  );
 }
 
 export function downloadDocxReport(jobId: string): Promise<void> {

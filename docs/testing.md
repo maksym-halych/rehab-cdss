@@ -38,6 +38,7 @@ The test and build checks need no clinic package, real patient data or provider 
 - Exercise matching: exact names, aliases, fuzzy/vector thresholds, missing results and source traceability.
 - Retrieval: metadata exclusions, empty results and ordering of protocol sections.
 - Module 2: synthetic JSON through the real LangGraph pipeline, Markdown renderer and DOCX exporter.
+- Demo JSON: every scenario has the Module 1 shape, the same seed gives the same values, and a generated export reaches the report.
 - JSON API: upload, form overrides, background processing, status polling, report downloads and existing input/size rejection rules.
 - Job store: save, update, list by owner and status, delete, jobs after a restart, and failing jobs that a restart interrupted (SQLite).
 - Job access: a doctor lists and opens only own jobs, an admin sees all, another user's job gives 404, and the list has no identity fields.

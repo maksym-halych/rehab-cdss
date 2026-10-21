@@ -112,3 +112,48 @@ def test_json_size_limit(client, monkeypatch):
     )
     assert response.status_code == 413
     assert client.get("/api/v1/jobs").json()["total"] == 0
+
+
+def test_generated_json_reaches_report(client):
+    response = client.get("/api/v1/demo/module1-json")
+    assert response.status_code == 200
+    disposition = response.headers["content-disposition"]
+    assert disposition.startswith('attachment; filename="synthetic_random_DEMO')
+    created = client.post(
+        "/api/v1/jobs/from-json",
+        files={"file": ("demo.json", response.content, "application/json")},
+    )
+    assert created.status_code == 202, created.text
+    state = wait_for_report(client, created.json()["status_url"])
+    assert state["result"]["rehab_report_md_url"]
+
+
+@pytest.mark.parametrize(
+    "scenario", ["acl_left", "shoulder_right", "low_back_posture", "healthy", "random"]
+)
+def test_generated_json_has_module1_shape(client, scenario):
+    data = client.get(f"/api/v1/demo/module1-json?scenario={scenario}").json()
+    assert data["synthetic"] and data["scenario"] == scenario
+    info = data["patient_info"]
+    assert 0 <= info["age"] <= 120
+    assert info["activity_level"] in {"elite", "recreational", "low"}
+    assert data["test_results"]
+    for test in data["test_results"]:
+        assert test["test_name"]
+        for table in test["results"]["tables"]:
+            for row in table["rows"]:
+                assert row["parameter"]
+                assert "value" in row or {"left", "right"} <= row.keys()
+
+
+def test_same_seed_gives_same_json(client):
+    def generate():
+        data = client.get("/api/v1/demo/module1-json?seed=7").json()
+        del data["generated_at"]
+        return data
+
+    assert generate() == generate()
+
+
+def test_unknown_scenario_is_rejected(client):
+    assert client.get("/api/v1/demo/module1-json?scenario=unknown").status_code == 422

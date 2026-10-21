@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import health, files, jobs, reports, patients
+from .routers import demo, health, files, jobs, reports, patients
 from .routers import config as cfg_router
 from .db import create_engine
 from .services.job_store import JobStore
@@ -17,6 +17,8 @@ def _configure_cors(app: FastAPI) -> None:
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
+        # Downloads read the file name from it
+        expose_headers=["Content-Disposition"],
         max_age=600,
     )
 
@@ -52,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(reports.router, prefix="/api/v1", tags=["Reports"])
     app.include_router(patients.router, prefix="/api/v1", tags=["Patients"])
     app.include_router(cfg_router.router, prefix="/api/v1", tags=["Config"])
+    app.include_router(demo.router, prefix="/api/v1", tags=["Demo"])
     return app
 
 

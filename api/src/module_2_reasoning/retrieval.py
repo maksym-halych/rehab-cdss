@@ -16,6 +16,7 @@ from chromadb import Collection
 
 from .embeddings import make_embedding_function
 from .paths import DATA_DIR
+from .privacy import active_guard
 
 CHROMA_DIR = DATA_DIR / "chromadb"
 
@@ -90,6 +91,7 @@ def search_protocols(
         List of dicts with keys: id, document, metadata, distance.
         Sorted by relevance (lowest distance first for cosine space).
     """
+    query = active_guard().text(query)
     protocols_col, _ = get_collections()
 
     filters = {}
@@ -203,6 +205,7 @@ def search_exercises(
     Returns:
         List of dicts with keys: id, document, metadata, distance.
     """
+    query = active_guard().text(query)
     _, exercises_col = get_collections()
 
     filters = {}

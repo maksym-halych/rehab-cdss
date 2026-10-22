@@ -4,6 +4,9 @@ import time
 from typing import Any, Callable, TypeVar
 
 import openai
+from langchain_core.globals import get_debug, get_verbose
+
+from .privacy import PrivacyError, active_guard
 
 T = TypeVar("T")
 
@@ -18,7 +21,7 @@ def invoke_with_retry(
     """Retry LLM invoke on transient API errors with exponential backoff.
 
     On RateLimitError: if fallback_invoke_fn is provided, call it once (no retry).
-    If fallback fails, re-raise. If not provided, keep backoff + retry behavior.
+    If fallback fails, raise a safe error. Otherwise keep backoff + retry behavior.
 
     Args:
         invoke_fn: Callable with no args that returns the LLM result.
@@ -30,33 +33,30 @@ def invoke_with_retry(
         The result of invoke_fn() or fallback_invoke_fn().
 
     Raises:
-        The last exception if all attempts fail.
+        PrivacyError with a static message if all attempts fail.
     """
-    last_err: BaseException | None = None
     for attempt in range(attempts):
         try:
             return invoke_fn()
-        except openai.RateLimitError as e:
-            last_err = e
+        except openai.RateLimitError:
             if fallback_invoke_fn is not None:
                 print("  Rate limit hit. Trying fallback model once...")
                 try:
                     return fallback_invoke_fn()
-                except Exception as fallback_err:
-                    raise fallback_err
+                except Exception:
+                    raise PrivacyError("The fallback model request failed.") from None
             delay = base_delay * (2**attempt)
             print(
-                f"  API error (attempt {attempt + 1}/{attempts}): {e}. Retrying in {delay}s..."
+                f"  Rate limit (attempt {attempt + 1}/{attempts}); retry in {delay}s."
             )
             time.sleep(delay)
-        except openai.InternalServerError as e:
-            last_err = e
+        except openai.InternalServerError:
             delay = base_delay * (2**attempt)
             print(
-                f"  API error (attempt {attempt + 1}/{attempts}): {e}. Retrying in {delay}s..."
+                f"  Provider unavailable (attempt {attempt + 1}/{attempts}); retry in {delay}s."
             )
             time.sleep(delay)
-    raise last_err
+    raise PrivacyError("The model request failed after retries.") from None
 
 
 def invoke_structured(
@@ -66,18 +66,44 @@ def invoke_structured(
     fallback_llm: Any | None = None,
 ) -> T:
     """Bind schema to LLM, invoke with retry/fallback, and return structured output."""
-    structured_llm = llm.with_structured_output(schema)
+    guard = active_guard()
+    if (
+        get_debug()
+        or get_verbose()
+        or any(
+            getattr(client, "callbacks", None) or getattr(client, "verbose", False)
+            for client in (llm, fallback_llm)
+            if client is not None
+        )
+    ):
+        raise PrivacyError(
+            "Patient processing does not permit debug output or model callbacks."
+        )
+    # Give the SDK a JSON schema, not a Pydantic class. Its automatic parsed-model
+    # serialization can issue warnings containing the unsanitized response.
+    # Validate locally, after removing identities from the returned JSON.
+    output_schema = schema.model_json_schema()
+    structured_llm = llm.with_structured_output(output_schema)
 
     def _invoke() -> T:
-        return structured_llm.invoke(prompt)
+        return schema.model_validate(
+            guard.clean(structured_llm.invoke(guard.text(prompt)))
+        )
 
     fallback_invoke_fn = None
     if fallback_llm is not None:
-        fallback_structured = fallback_llm.with_structured_output(schema)
+        fallback_structured = fallback_llm.with_structured_output(output_schema)
 
         def _fallback() -> T:
-            return fallback_structured.invoke(prompt)
+            return schema.model_validate(
+                guard.clean(fallback_structured.invoke(guard.text(prompt)))
+            )
 
         fallback_invoke_fn = _fallback
 
-    return invoke_with_retry(_invoke, fallback_invoke_fn=fallback_invoke_fn)
+    try:
+        return invoke_with_retry(_invoke, fallback_invoke_fn=fallback_invoke_fn)
+    except PrivacyError:
+        raise
+    except Exception:
+        raise PrivacyError("The model request failed.") from None

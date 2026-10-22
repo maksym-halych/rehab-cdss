@@ -68,6 +68,7 @@ uv run --project api pre-commit run --all-files
 - Do not send names, birth dates or patient IDs to an LLM. Send only age, gender, activity level and test values.
 - Do not write personal data to logs.
 - Use only synthetic data in fixtures, tests and examples.
+- Patient runs must enter through `build_pipeline(...).invoke(...)`. Use the shared `invoke_structured` helper for all patient LLM calls and guarded retrieval for embeddings. Do not bypass the privacy context or add payload logging/callbacks. See `docs/adr/ADR-05-llm-privacy.md` for the policy and free-text limits.
 
 ## Work process
 

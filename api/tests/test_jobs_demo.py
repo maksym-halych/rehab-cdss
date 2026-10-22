@@ -62,6 +62,7 @@ def wait_for_report(client, status_url):
 def test_json_input_reaches_report_and_preserves_form_overrides(
     client, synthetic_patient
 ):
+    synthetic_patient["patient_info"]["name"] = "PRIVATE_NAME_SENTINEL"
     response = client.post(
         "/api/v1/jobs/from-json",
         files={
@@ -79,7 +80,7 @@ def test_json_input_reaches_report_and_preserves_form_overrides(
     report = client.get(result["rehab_report_md_url"])
     assert report.status_code == 200
     assert "Synthetic demo report" in report.text
-    assert "Synthetic demo patient" not in report.text
+    assert "PRIVATE_NAME_SENTINEL" not in report.text
     assert "DEMO-0001" not in report.text
     docx = client.get(result["rehab_report_docx_url"])
     assert docx.status_code == 200 and docx.content.startswith(b"PK")
@@ -157,3 +158,73 @@ def test_same_seed_gives_same_json(client):
 
 def test_unknown_scenario_is_rejected(client):
     assert client.get("/api/v1/demo/module1-json?scenario=unknown").status_code == 422
+def test_provider_error_is_not_returned_in_job_status(
+    client, synthetic_patient, monkeypatch, caplog, capsys
+):
+    import langchain_openai
+
+    class FailingLLM(FakeLLM):
+        def respond(self, schema, prompt):
+            raise RuntimeError("PRIVATE_PATIENT_SENTINEL synthetic-provider-secret")
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", FailingLLM)
+    response = client.post(
+        "/api/v1/jobs/from-json",
+        files={
+            "file": ("private.json", json.dumps(synthetic_patient), "application/json")
+        },
+    )
+    assert response.status_code == 202
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        status = client.get(response.json()["status_url"])
+        if status.json()["module2_status"] == "failed":
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail("Failed provider was not reflected in job status")
+    output = status.text + caplog.text + capsys.readouterr().out
+    assert "PRIVATE_PATIENT_SENTINEL" not in output
+    assert "synthetic-provider-secret" not in output
+    assert status.json()["module2_error"]
+
+
+def test_form_identity_overrides_do_not_lose_original_redaction_tokens(
+    client, synthetic_patient, monkeypatch, capsys
+):
+    import langchain_openai
+
+    tokens = [
+        "ORIGINAL_PRIVATE_NAME",
+        "ORIGINAL_PRIVATE_CODE",
+        "EDITED_PRIVATE_NAME",
+        "EDITED_PRIVATE_CODE",
+    ]
+    synthetic_patient["patient_info"].update(name=tokens[0], patient_code=tokens[1])
+    synthetic_patient["test_results"][0]["interpretation"] = (
+        "Strength deficit 40%; " + "; ".join(tokens)
+    )
+    prompts = []
+
+    class CapturingLLM(FakeLLM):
+        def respond(self, schema, prompt):
+            prompts.append(prompt)
+            return super().respond(schema, prompt)
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", CapturingLLM)
+    response = client.post(
+        "/api/v1/jobs/from-json",
+        files={
+            "file": ("demo.json", json.dumps(synthetic_patient), "application/json")
+        },
+        data={"manual_person_name": tokens[2], "patient_code": tokens[3]},
+    )
+    assert response.status_code == 202
+    state = wait_for_report(client, response.json()["status_url"])
+    export = client.get(state["result"]["report_json_url"]).json()
+    assert export["patient_info"]["name"] == tokens[2]
+    assert export["patient_info"]["patient_code"] == tokens[3]
+    assert prompts
+    output = "\n".join(prompts) + capsys.readouterr().out
+    for token in tokens:
+        assert token not in output

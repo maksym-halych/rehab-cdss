@@ -273,6 +273,9 @@ async def create_job_from_json(
     patient_info = data.get("patient_info")
     if not isinstance(patient_info, dict):
         patient_info = {}
+    # Keep original identities available to the local scrubber after form edits.
+    # This field stays in the local export and is excluded from graph/LLM input.
+    data["_privacy_source_patient_info"] = dict(patient_info)
     overrides = {
         "age": age,
         "gender": gender,

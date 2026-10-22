@@ -63,13 +63,12 @@ def main() -> None:
         raise ValueError("DIPLOMA_API_KEY environment variable is required")
 
     input_path: Path = args.file or pick_latest_export()
-    print(f"Input: {input_path}")
+    print("Loading input for de-identified processing.")
 
     with input_path.open(encoding="utf-8") as f:
         module1_data = json.load(f)
 
     patient_info = module1_data.get("patient_info", {})
-    print(f"Patient: {patient_info}")
 
     llm = ChatOpenAI(
         model=LLM_MODEL,
@@ -105,26 +104,8 @@ def main() -> None:
     final_state = pipeline.invoke(initial_state)
 
     summary = final_state["clinical_summary"]
-    retrieved = final_state["retrieved_protocols"]
-    protocol_queries = final_state["protocol_queries"]
-    filtered_results = final_state["filtered_results"]
+    retrieved = final_state["full_protocols"]
     enriched_plan = final_state.get("enriched_plan")
-
-    state_to_dump = {
-        # "module1_data_keys": list(module1_data.keys()) if module1_data else [],
-        # "module1_test_count": len(module1_data.get("test_results", [])),
-        "patient_info": patient_info,
-        "filtered_results": [fr.model_dump() for fr in filtered_results],
-        "clinical_summary": summary.model_dump() if summary else None,
-        "protocol_queries": [q.model_dump() for q in protocol_queries],
-        "retrieved_protocols": retrieved,
-        "enriched_plan": enriched_plan,
-    }
-
-    print("\n" + "=" * 60)
-    print("--- FULL PIPELINE STATE ---")
-    print("=" * 60)
-    print(json.dumps(state_to_dump, ensure_ascii=False, indent=2))
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
@@ -133,20 +114,20 @@ def main() -> None:
     summary_path.write_text(
         json.dumps(summary.model_dump(), ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(f"\nSaved clinical_summary → {summary_path}")
+    print("Saved de-identified clinical summary.")
 
     protocols_path = OUTPUT_DIR / f"{timestamp}_retrieved_protocols.json"
     protocols_path.write_text(
         json.dumps(retrieved, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    print(f"Saved retrieved_protocols → {protocols_path}")
+    print("Saved retrieved protocols.")
 
     if enriched_plan:
         plan_path = OUTPUT_DIR / f"{timestamp}_treatment_plan.json"
         plan_path.write_text(
             json.dumps(enriched_plan, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        print(f"Saved treatment_plan → {plan_path}")
+        print("Saved de-identified treatment plan.")
 
     final_report = final_state.get("final_report")
     if final_report:
@@ -154,8 +135,15 @@ def main() -> None:
         reports_dir.mkdir(parents=True, exist_ok=True)
         report_path = reports_dir / f"{timestamp}_rehabilitation_report.md"
         report_path.write_text(final_report, encoding="utf-8")
-        print(f"Saved rehabilitation report → {report_path}")
+        print("Saved de-identified rehabilitation report.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print(
+            "Module 2 failed. Check the input format and provider configuration.",
+            file=sys.stderr,
+        )
+        sys.exit(1)

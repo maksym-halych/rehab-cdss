@@ -142,9 +142,9 @@ async def run_module2_async(
             module2_report_md_path=md_path,
             module2_report_docx_path=docx_path,
         )
-    except Exception as exc:
+    except Exception:
         await job_store.update(
             job_id,
             module2_status=Module2Status.FAILED,
-            module2_error=str(exc),
+            module2_error="Module 2 failed. Check the input format and provider configuration.",
         )

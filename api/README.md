@@ -24,3 +24,8 @@ The scripts in the root `scripts/` folder use this environment: `uv run --projec
 
 Run tests with `uv run --locked pytest --cov --cov-report=html --cov-report=xml`.
 See [backend tests and CI](../docs/testing.md) for the synthetic JSON scenario and coverage reports.
+
+Patient processing enters through `build_pipeline(...).invoke(...)`, which applies
+the shared privacy guard before graph execution, chat calls and embedding queries.
+See [ADR-05](../docs/adr/ADR-05-llm-privacy.md) for allowed fields, logging rules and
+free-text limitations. The raw JSON export remains local and is not anonymized.

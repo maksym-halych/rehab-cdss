@@ -40,6 +40,7 @@ from module_2_reasoning.report_formatter import generate_english_report, transla
 from module_2_reasoning.summarizer import summarize
 
 from module_2_reasoning._retry import invoke_structured
+from module_2_reasoning.privacy import PrivatePipeline
 
 
 class PipelineState(TypedDict):
@@ -96,7 +97,7 @@ Output STRICT JSON matching the schema.
 def build_pipeline(
     llm: ChatOpenAI, *, fallback_llm: ChatOpenAI | None = None, on_step_start=None
 ):
-    """Factory — returns a compiled LangGraph pipeline."""
+    """Return the compiled graph behind the patient privacy boundary."""
 
     def _notify(step_name: str):
         if on_step_start is not None:
@@ -131,8 +132,6 @@ def build_pipeline(
         prompt = QUERY_GEN_PROMPT.format(key_concerns=key_concerns_text)
         result = invoke_structured(llm, ProtocolQueryList, prompt, fallback_llm)
         print(f"  Generated {len(result.queries)} query/queries:")
-        for q in result.queries:
-            print(f"    [{q.body_part}] {q.keywords}")
         return {"protocol_queries": result.queries}
 
     def protocol_retriever_node(state: PipelineState) -> dict:
@@ -391,8 +390,6 @@ Begin with thought_process — evaluate target conditions against the patient su
 
         rejected_count = len(full_protocols) - len(kept)
         print(f"  Kept {len(kept)} protocol(s), rejected {rejected_count}")
-        for fb in new_feedback:
-            print(f"    {fb}")
 
         return {
             "relevant_protocols": kept,
@@ -448,8 +445,6 @@ Begin with thought_process — analyze what went wrong and how to fix it.
         print(
             f"  Rewrote {len(result.queries)} query/queries (retry {state.get('retries', 0) + 1}):"
         )
-        for q in result.queries:
-            print(f"    [{q.body_part}] {q.keywords}")
 
         return {
             "protocol_queries": result.queries,
@@ -514,4 +509,4 @@ Begin with thought_process — analyze what went wrong and how to fix it.
         .add_edge("report_translator", END)
         .compile()
     )
-    return graph
+    return PrivatePipeline(graph)

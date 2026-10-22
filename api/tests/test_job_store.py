@@ -7,6 +7,9 @@ from api.db import create_engine
 from api.models.jobs import JobStatus, Module2Status
 from api.services.job_store import JobStore
 
+# Windows asyncio uses a loopback socket pair even for SQLite-only tests.
+pytestmark = pytest.mark.allow_hosts(["127.0.0.1", "::1"])
+
 
 def run(coro):
     return asyncio.run(coro)

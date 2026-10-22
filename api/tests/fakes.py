@@ -5,6 +5,17 @@ from types import SimpleNamespace
 from module_2_reasoning import schemas
 
 
+IDENTITY = {
+    "name": "Марко Тестовий Синтетичний",
+    "patient_code": "PRIVATE-PATIENT-4829",
+    "birth_date": "1990-04-12",
+    "email": "synthetic.person@example.org",
+    "phone": "+380 (50) 123-45-67",
+    "address": "PRIVATE_ADDRESS_4829",
+    "external_reference": "PRIVATE_REFERENCE_4829",
+}
+
+
 PROTOCOL_HIT = {
     "id": "synthetic-knee-0",
     "document": "Synthetic Knee extension protocol for testing only.",
@@ -29,6 +40,8 @@ class FakeLLM:
         self.calls = []
 
     def with_structured_output(self, schema):
+        if isinstance(schema, dict):
+            schema = getattr(schemas, schema["name"])
         return SimpleNamespace(invoke=lambda prompt: self.respond(schema, prompt))
 
     def respond(self, schema, prompt):

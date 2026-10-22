@@ -43,7 +43,7 @@ The test and build checks need no clinic package, real patient data or provider 
 - Job store: save, update, list by owner and status, delete, jobs after a restart, and failing jobs that a restart interrupted (SQLite).
 - Job access: a doctor lists and opens only own jobs, an admin sees all, another user's job gives 404, and the list has no identity fields.
 - Migrations on Postgres 16: upgrade on an empty database, downgrade and upgrade again, check constraints and the primary key.
-- Patient identity fields are excluded from the report-generation prompt. Tests check that synthetic identity sentinels do not reach LLM prompts or output reports.
+- Privacy (E2.6 / #23): all patient LLM stages, real SDK HTTP payloads with mocked transport, retries, fallback, embedding queries, tracing, concurrent contexts, CLI output, API errors and form identity overrides. Synthetic identity sentinels must not reach prompts, output reports or logs.
 
 Deterministic substitutes replace LLM responses and knowledge-base searches.
 Tests do not use a live ChromaDB or paid LLM requests.
@@ -59,7 +59,8 @@ docker exec rehab-cdss-db createdb -U rehab rehab_test
 cd api && TEST_DATABASE_URL=postgresql://rehab:rehab@127.0.0.1:5432/rehab_test uv run pytest tests/test_migrations.py
 ```
 
-Free-text de-identification remains a separate E2.6 task.
+See [ADR-05](adr/ADR-05-llm-privacy.md) for de-identification rules and the limits of free-text matching.
+Run `uv run --locked pytest -W error` to also reject SDK warnings that could expose response content.
 
 Coverage includes all Python source under `api/src/`.
 The XML and HTML reports are written to `api/coverage.xml` and `api/htmlcov/`.

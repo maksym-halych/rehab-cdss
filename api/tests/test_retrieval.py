@@ -3,6 +3,13 @@ from unittest.mock import Mock
 import pytest
 
 from module_2_reasoning import retrieval
+from module_2_reasoning.privacy import PrivacyGuard, privacy_scope
+
+
+@pytest.fixture(autouse=True)
+def patient_privacy_scope():
+    with privacy_scope(PrivacyGuard()):
+        yield
 
 
 @pytest.fixture

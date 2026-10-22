@@ -1,26 +1,9 @@
 from copy import deepcopy
-from unittest.mock import Mock
 from zipfile import ZipFile
 
-import pytest
-
-from fakes import EXERCISE_HIT, PROTOCOL_HIT, FakeLLM
+from fakes import EXERCISE_HIT, FakeLLM
 from module_2_reasoning import graph
 from module_2_reasoning.docx_export import markdown_to_docx
-
-
-@pytest.fixture
-def external_services(monkeypatch):
-    protocols = Mock(return_value=[deepcopy(PROTOCOL_HIT)])
-    exercises = Mock(return_value=[deepcopy(EXERCISE_HIT)])
-    monkeypatch.setattr(graph, "search_protocols", protocols)
-    monkeypatch.setattr(graph, "search_exercises", exercises)
-    monkeypatch.setattr(
-        graph,
-        "fetch_full_protocol",
-        Mock(side_effect=AssertionError("Unexpected external lookup")),
-    )
-    return protocols, exercises
 
 
 def initial_state(patient):

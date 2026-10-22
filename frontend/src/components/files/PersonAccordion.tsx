@@ -17,7 +17,6 @@ interface PersonAccordionProps {
 }
 
 export const PersonAccordion: React.FC<PersonAccordionProps> = ({
-  personKey: _personKey,
   displayName,
   isOpen,
   onToggle,

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { UserButton } from '@clerk/react';
 import { RehabLayout } from './components/layout/RehabLayout';
 import { FilesPanel } from './components/layout/FilesPanel';
 import { ParamsPanel } from './components/layout/ParamsPanel';
 import { RecommendationsPanel } from './components/layout/RecommendationsPanel';
+import { JobHistoryPanel } from './components/history/JobHistoryPanel';
 import { TabNav } from './components/ui/TabNav';
 import type { Tab } from './components/ui/TabNav';
 import { Button } from './components/ui/Button';
@@ -22,21 +24,25 @@ const ACTIVITY_VALUES: PatientParams['activityLevel'][] = ['elite', 'recreationa
 const BASE_TABS: Tab[] = [
   { key: 'analysis', label: 'Аналіз' },
   { key: 'recommendations', label: 'Клінічні рекомендації' },
+  { key: 'history', label: 'Мої аналізи' },
 ];
 
 function AppHeader({ isDark, onToggleTheme }: { isDark: boolean; onToggleTheme: () => void }) {
   return (
     <div className={styles.headerInner}>
       <span className={styles.appName}>Rehab CDSS</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        aria-label={isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
-        onClick={onToggleTheme}
-      >
-        {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
-      </Button>
+      <div className={styles.headerActions}>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-label={isDark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}
+          onClick={onToggleTheme}
+        >
+          {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+        </Button>
+        <UserButton />
+      </div>
     </div>
   );
 }
@@ -157,6 +163,13 @@ export default function App() {
     setPatientParam('personName', '');
   };
 
+  // Opens a saved job: its report is on the recommendations tab
+  const handleOpenJob = (jobId: string) => {
+    handleClear();
+    setCurrentJobId(jobId);
+    setActiveTab('recommendations');
+  };
+
   const handleRemoveFile = (fileName: string) => {
     const uploaded = files.find((f) => f.originalName === fileName);
     if (uploaded) removeFile(uploaded.clientId);
@@ -197,16 +210,16 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (job?.status === 'failed') {
+  // Stop processing when the job reaches a terminal state (state adjusted during render, not in an effect)
+  const jobStatusKey = `${job?.status}:${job?.module2_status}`;
+  const [prevJobStatusKey, setPrevJobStatusKey] = useState(jobStatusKey);
+  if (jobStatusKey !== prevJobStatusKey) {
+    setPrevJobStatusKey(jobStatusKey);
+    const m2Done = job?.module2_status === 'completed' || job?.module2_status === 'failed';
+    if (job?.status === 'failed' || (job?.status === 'completed' && m2Done)) {
       setIsProcessing(false);
-      return;
     }
-    if (job?.status === 'completed' &&
-        (job?.module2_status === 'completed' || job?.module2_status === 'failed')) {
-      setIsProcessing(false);
-    }
-  }, [job?.status, job?.module2_status]);
+  }
 
   const hasFiles = files.length > 0;
 
@@ -308,6 +321,10 @@ export default function App() {
 
       {activeTab === 'recommendations' && (
         <RecommendationsPanel job={effectiveJob} currentJobId={currentJobId} />
+      )}
+
+      {activeTab === 'history' && (
+        <JobHistoryPanel currentJobId={currentJobId} config={config} onOpen={handleOpenJob} />
       )}
     </RehabLayout>
   );

@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "patient_info": {
+    "age": 30,
+    "gender": "Чоловік",
+    "activity_level": "recreational",
+    "name": "Synthetic demo patient",
+    "patient_code": "DEMO-0001"
+  },
+  "test_results": [
+    {
+      "test_name": "Synthetic strength measurement",
+      "interpretation": null,
+      "recommendations": null,
+      "results": {
+        "tables": [
+          {
+            "rows": [
+              {
+                "parameter": "Synthetic strength",
+                "left": 12,
+                "right": 20,
+                "unit": "kg",
+                "norm": [15, 25],
+                "asymmetry_percent": 40,
+                "asymmetry_norm_max": 10
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

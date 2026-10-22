@@ -1,10 +1,11 @@
-import React from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Dices, Trash2 } from 'lucide-react';
 import { FileListScroller } from '../files/FileListScroller';
 import { FileUploadTrigger } from '../files/FileUploadTrigger';
 import { PersonSelector } from '../files/PersonSelector';
 import { JsonPreview } from '../files/JsonPreview';
 import { Button } from '../ui/Button';
+import { downloadDemoJson } from '../../api/client';
 import type {
   DetectFilesResponse,
   ConfigResponse,
@@ -55,6 +56,12 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
   error,
 }) => {
   const multiplePeople = detectedPeople.length > 1;
+  const [isGenerating, setIsGenerating] = useState(false);
+  const handleDemoJson = async () => {
+    setIsGenerating(true);
+    await downloadDemoJson();
+    setIsGenerating(false);
+  };
   return (
     <section
       className={styles.panel}
@@ -78,6 +85,17 @@ export const FilesPanel: React.FC<FilesPanelProps> = ({
         </div>
         <div className={styles.headerActions}>
           <FileUploadTrigger onFilesAdded={onFilesAdded} variant="inline" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDemoJson}
+            loading={isGenerating}
+            type="button"
+            title="Завантажити JSON Модуля 1 з вигаданим пацієнтом"
+          >
+            <Dices size={14} aria-hidden="true" />
+            Демо JSON
+          </Button>
           <Button
             variant="ghost"
             size="sm"

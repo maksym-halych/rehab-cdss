@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "rehab-cdss-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain-openai>=0.2.0",
+    "pydantic>=2.0",
+    "pypdf==4.3.1",
+    "python-docx==1.1.2",
+    "requests>=2.32.5",
+    "chromadb>=0.6.0",
+    "langgraph>=1.1.1",
+    "rapidfuzz>=3.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "aiofiles>=24.1.0",
+    "python-dotenv>=1.0.0",
+    "pyjwt[crypto]>=2.10",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+]
+
+[project.scripts]
+rehab-api = "api.app:launch_api"
+
+[dependency-groups]
+dev = [
+    "pre-commit==4.7.0",
+    "ruff==0.15.4",
+    "pytest>=8.3,<10",
+    "pytest-cov>=6,<8",
+    "pytest-socket>=0.7,<1",
+    "aiosqlite>=0.20",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--disable-socket --allow-unix-socket"
+
+[tool.coverage.run]
+source = ["src"]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true

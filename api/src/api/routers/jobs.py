@@ -1,0 +1,370 @@
+import json
+from datetime import datetime, timezone
+from typing import Literal, Optional
+
+import asyncio
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel
+
+from ..dependencies import CurrentUser, get_current_user, get_job_store, get_owned_job
+from ..services.file_service import save_uploads
+from ..models.jobs import Job, JobStatus, Module2Status
+from ..services.job_store import JobStore
+from ..services.module2_service import REPORTS_ROOT, run_module2_async
+from ..services.pipeline_service import run_pipeline_async
+
+router = APIRouter(dependencies=[Depends(get_current_user)])
+
+ALLOWED_ACTIVITY_LEVELS = {"elite", "recreational", "low"}
+
+
+class JobCreatedResponse(BaseModel):
+    job_id: str
+    status: Literal["pending"]
+    status_url: str
+    created_at: str
+
+
+class JobResultLinks(BaseModel):
+    report_json_url: str
+    report_docx_url: str
+    rehab_report_md_url: Optional[str] = None
+    rehab_report_docx_url: Optional[str] = None
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: Literal["pending", "running", "completed", "failed"]
+    created_at: str
+    completed_at: Optional[str] = None
+    error: Optional[str] = None
+    warnings: list[str] = []
+    result: Optional[JobResultLinks] = None
+    # Module 2 progress fields
+    module2_status: Literal["idle", "running", "completed", "failed"] = "idle"
+    module2_step: Optional[str] = None
+    module2_step_index: int = 0
+    module2_total_steps: int = 9
+    module2_step_label: Optional[str] = None
+    module2_error: Optional[str] = None
+
+
+class JobSummary(BaseModel):
+    job_id: str
+    status: str
+    module2_status: str
+    created_at: str
+    completed_at: Optional[str] = None
+    # Patient context to tell the jobs apart; no names or patient IDs
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    activity_level: Optional[str] = None
+
+
+class JobListResponse(BaseModel):
+    jobs: list[JobSummary]
+    total: int
+
+
+def _job_to_status_response(job: Job) -> JobStatusResponse:
+    result = None
+    if job.status == JobStatus.COMPLETED:
+        links = {
+            "report_json_url": f"/api/v1/reports/{job.job_id}/json",
+            "report_docx_url": f"/api/v1/reports/{job.job_id}/docx",
+        }
+        if job.module2_status == Module2Status.COMPLETED:
+            links["rehab_report_md_url"] = f"/api/v1/reports/{job.job_id}/rehab-report"
+            links["rehab_report_docx_url"] = (
+                f"/api/v1/reports/{job.job_id}/rehab-report/docx"
+            )
+        result = JobResultLinks(**links)
+    return JobStatusResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        created_at=job.created_at.isoformat(),
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        error=job.error,
+        warnings=job.warnings,
+        result=result,
+        module2_status=job.module2_status.value,
+        module2_step=job.module2_step,
+        module2_step_index=job.module2_step_index,
+        module2_total_steps=job.module2_total_steps,
+        module2_step_label=job.module2_step_label,
+        module2_error=job.module2_error,
+    )
+
+
+@router.post(
+    "/jobs", status_code=status.HTTP_202_ACCEPTED, response_model=JobCreatedResponse
+)
+async def create_job(
+    files: list[UploadFile] = File(...),
+    age: Optional[int] = Form(default=None),
+    gender: Optional[str] = Form(default=None),
+    activity_level: str = Form(...),
+    manual_person_name: str = Form(default=""),
+    selected_person_key: str = Form(default=""),
+    patient_code: str = Form(default=""),
+    pushup_type_overrides: str = Form(default="{}"),
+    manual_test_overrides: str = Form(default="{}"),
+    job_store: JobStore = Depends(get_job_store),
+    user: CurrentUser = Depends(get_current_user),
+) -> JobCreatedResponse:
+    # Validate activity level
+    if activity_level not in ALLOWED_ACTIVITY_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_ACTIVITY_LEVEL",
+                "message": f"activity_level must be one of: {sorted(ALLOWED_ACTIVITY_LEVELS)}",
+            },
+        )
+    # Validate age
+    if age is not None and not (0 <= age <= 120):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_AGE", "message": "age must be between 0 and 120"},
+        )
+    # Parse JSON overrides
+    try:
+        pushup_overrides_dict: dict = json.loads(pushup_type_overrides)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_JSON",
+                "message": "pushup_type_overrides must be valid JSON",
+            },
+        )
+    try:
+        manual_overrides_dict: dict = json.loads(manual_test_overrides)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_JSON",
+                "message": "manual_test_overrides must be valid JSON",
+            },
+        )
+    if not files:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "NO_FILES", "message": "No files provided"},
+        )
+
+    # Create job
+    job = await job_store.create(
+        created_by=user.user_id,
+        age=age,
+        gender=gender[:32] if gender else None,
+        activity_level=activity_level,
+    )
+
+    # Save uploads to disk
+    try:
+        file_paths = await save_uploads(job.job_id, files)
+    except ValueError as e:
+        await job_store.update(job.job_id, status=JobStatus.FAILED, error=str(e))
+        code = "FILE_TOO_LARGE" if "too large" in str(e).lower() else "INVALID_FILE"
+        http_status = (
+            413
+            if "too large" in str(e).lower() or "too many" in str(e).lower()
+            else 400
+        )
+        raise HTTPException(
+            status_code=http_status, detail={"code": code, "message": str(e)}
+        )
+
+    # Map basename keys from the frontend to full server-side paths
+    path_by_basename = {p.name: str(p) for p in file_paths}
+    pushup_mapped = {
+        path_by_basename.get(k, k): v for k, v in pushup_overrides_dict.items()
+    }
+    manual_mapped = {
+        path_by_basename.get(k, k): v for k, v in manual_overrides_dict.items()
+    }
+
+    # Dispatch pipeline to thread pool (non-blocking)
+    asyncio.get_running_loop().create_task(
+        run_pipeline_async(
+            job_id=job.job_id,
+            file_paths=file_paths,
+            age=age,
+            gender=gender or None,
+            activity_level=activity_level,
+            pushup_type_overrides=pushup_mapped,
+            manual_test_overrides=manual_mapped,
+            selected_person_key=selected_person_key or None,
+            manual_person_name=manual_person_name or None,
+            patient_code=patient_code or None,
+            job_store=job_store,
+        )
+    )
+
+    return JobCreatedResponse(
+        job_id=job.job_id,
+        status="pending",
+        status_url=f"/api/v1/jobs/{job.job_id}",
+        created_at=job.created_at.isoformat(),
+    )
+
+
+MAX_JSON_SIZE_BYTES = 5 * 1024 * 1024
+
+
+@router.post(
+    "/jobs/from-json",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobCreatedResponse,
+)
+async def create_job_from_json(
+    file: UploadFile = File(...),
+    age: Optional[int] = Form(default=None),
+    gender: Optional[str] = Form(default=None),
+    activity_level: Optional[str] = Form(default=None),
+    manual_person_name: str = Form(default=""),
+    patient_code: str = Form(default=""),
+    job_store: JobStore = Depends(get_job_store),
+    user: CurrentUser = Depends(get_current_user),
+) -> JobCreatedResponse:
+    """Run Module 2 directly on an uploaded Module 1 JSON export (skips Module 1).
+
+    Intended for testing and demos with synthetic exports
+    (GET /api/v1/demo/module1-json). Non-empty form fields override
+    the matching ``patient_info`` values from the JSON.
+    """
+    raw = await file.read(MAX_JSON_SIZE_BYTES + 1)
+    if len(raw) > MAX_JSON_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={"code": "FILE_TOO_LARGE", "message": "JSON file is larger than 5 MB"},
+        )
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_JSON", "message": "File is not valid UTF-8 JSON"},
+        )
+    if not isinstance(data, dict) or not isinstance(data.get("test_results"), list):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_MODULE1_JSON",
+                "message": "JSON must be an object with a 'test_results' list",
+            },
+        )
+    if activity_level and activity_level not in ALLOWED_ACTIVITY_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "INVALID_ACTIVITY_LEVEL",
+                "message": f"activity_level must be one of: {sorted(ALLOWED_ACTIVITY_LEVELS)}",
+            },
+        )
+    if age is not None and not (0 <= age <= 120):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "INVALID_AGE", "message": "age must be between 0 and 120"},
+        )
+
+    patient_info = data.get("patient_info")
+    if not isinstance(patient_info, dict):
+        patient_info = {}
+    overrides = {
+        "age": age,
+        "gender": gender,
+        "activity_level": activity_level,
+        "name": manual_person_name,
+        "patient_code": patient_code,
+    }
+    patient_info.update({k: v for k, v in overrides.items() if v not in (None, "")})
+    data["patient_info"] = patient_info
+
+    json_age = patient_info.get("age")
+    json_gender = patient_info.get("gender")
+    json_level = patient_info.get("activity_level")
+    job = await job_store.create(
+        created_by=user.user_id,
+        # Only valid values from the JSON go to the job list
+        age=json_age if isinstance(json_age, int) and 0 <= json_age <= 120 else None,
+        gender=json_gender[:32] if isinstance(json_gender, str) and json_gender else None,
+        activity_level=json_level if json_level in ALLOWED_ACTIVITY_LEVELS else None,
+    )
+    job_dir = REPORTS_ROOT / job.job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    json_path = job_dir / "module1_export.json"
+    json_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Module 1 is skipped: the job is "completed" as soon as the export is saved.
+    await job_store.update(
+        job.job_id,
+        status=JobStatus.COMPLETED,
+        completed_at=datetime.now(timezone.utc),
+        json_export_path=str(json_path),
+    )
+    asyncio.get_running_loop().create_task(
+        run_module2_async(job.job_id, str(json_path), job_store)
+    )
+
+    return JobCreatedResponse(
+        job_id=job.job_id,
+        status="pending",
+        status_url=f"/api/v1/jobs/{job.job_id}",
+        created_at=job.created_at.isoformat(),
+    )
+
+
+@router.get("/jobs", response_model=JobListResponse)
+async def list_jobs(
+    status: Optional[str] = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: CurrentUser = Depends(get_current_user),
+    job_store: JobStore = Depends(get_job_store),
+) -> JobListResponse:
+    """The user's jobs, newest first. An admin gets the jobs of all users."""
+    page, total = await job_store.list(
+        created_by=None if user.is_admin else user.user_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    return JobListResponse(
+        jobs=[
+            JobSummary(
+                job_id=j.job_id,
+                status=j.status.value,
+                module2_status=j.module2_status.value,
+                created_at=j.created_at.isoformat(),
+                completed_at=j.completed_at.isoformat() if j.completed_at else None,
+                age=j.age,
+                gender=j.gender,
+                activity_level=j.activity_level,
+            )
+            for j in page
+        ],
+        total=total,
+    )
+
+
+@router.get("/jobs/{job_id}", response_model=JobStatusResponse)
+async def get_job(
+    job: Job = Depends(get_owned_job),
+) -> JobStatusResponse:
+    return _job_to_status_response(job)
+
+
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_job(
+    job: Job = Depends(get_owned_job),
+    job_store: JobStore = Depends(get_job_store),
+) -> None:
+    if job.status == JobStatus.RUNNING or job.module2_status == Module2Status.RUNNING:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "JOB_RUNNING", "message": "Cannot cancel a running job"},
+        )
+    await job_store.delete(job.job_id)

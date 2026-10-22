@@ -4,11 +4,7 @@ on:
   push:
     branches: [dev, main]
     paths:
-      - "src/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "Dockerfile"
-      - ".dockerignore"
+      - "api/**"
       - "docker-compose.yaml"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
@@ -17,6 +13,10 @@ on:
 concurrency:
   group: vps-deploy
   cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read # the Telegram notification finds the merged PR
 
 jobs:
   deploy:
@@ -27,6 +27,11 @@ jobs:
       # main → ~/rehab-cdss (prod), dev → ~/rehab-cdss-dev
       REPO_DIR: ${{ github.ref_name == 'main' && 'rehab-cdss' || 'rehab-cdss-dev' }}
     steps:
+      # Only the local notify action; the deploy itself pulls the code on the VPS
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions
+
       - name: Configure SSH
         run: |
           install -m 700 -d ~/.ssh
@@ -41,21 +46,37 @@ jobs:
           set -euo pipefail
           cd "$HOME/$REPO_DIR"
 
+          # One-time move: .env was in the repo root before the backend moved to api/
+          if [ -f .env ] && [ ! -f api/.env ]; then
+            mkdir -p api && mv .env api/.env
+          fi
+
           # .env and data/ are git-ignored, so the reset does not touch them
           git fetch --quiet origin "$BRANCH"
           git reset --hard "origin/$BRANCH"
           echo "Deploying $(git log --oneline -1) to ~/$REPO_DIR"
 
-          docker compose up -d --build --remove-orphans
+          docker compose --env-file api/.env up -d --build --remove-orphans
           docker image prune -f
 
-          container=$(docker compose ps -q api)
+          container=$(docker compose --env-file api/.env ps -q api)
           for _ in $(seq 1 30); do
             status=$(docker inspect -f '{{.State.Health.Status}}' "$container")
             echo "health: $status"
             [ "$status" = healthy ] && exit 0
             sleep 5
           done
-          docker compose logs --tail 50 api
+          docker compose --env-file api/.env logs --tail 50 api
           exit 1
           EOF
+
+      - name: Notify Telegram
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/telegram-notify
+        with:
+          target: API
+          status: ${{ job.status }}
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          github-token: ${{ github.token }}

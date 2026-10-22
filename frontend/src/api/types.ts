@@ -87,6 +87,22 @@ export interface Job {
   module2_error: string | null;
 }
 
+/** One row of "Мої аналізи": no names or patient IDs. */
+export interface JobSummary {
+  job_id: string;
+  status: JobStatus;
+  module2_status: Module2Status;
+  created_at: string;
+  completed_at: string | null;
+  age: number | null;
+  gender: string | null;
+  activity_level: string | null;
+}
+export interface JobListResponse {
+  jobs: JobSummary[];
+  total: number;
+}
+
 export interface PatientParams {
   age: number | null;
   gender: string | null;

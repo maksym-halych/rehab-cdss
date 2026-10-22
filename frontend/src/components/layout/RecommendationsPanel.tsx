@@ -16,25 +16,34 @@ export const RecommendationsPanel: React.FC<RecommendationsPanelProps> = ({
   job,
   currentJobId,
 }) => {
-  const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  // Report and fetch failure are keyed by job id, so a new job shows no stale report
+  const [report, setReport] = useState<{ jobId: string; markdown: string } | null>(null);
+  const [failedJobId, setFailedJobId] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Reset report when job changes
-  useEffect(() => {
-    setReportMarkdown(null);
-  }, [currentJobId]);
+  const reportMarkdown = report && report.jobId === currentJobId ? report.markdown : null;
+  const isLoadingReport =
+    job?.module2_status === 'completed' &&
+    currentJobId !== null &&
+    reportMarkdown === null &&
+    failedJobId !== currentJobId;
 
   // Fetch report when module2 completes
   useEffect(() => {
-    if (job?.module2_status === 'completed' && currentJobId && !reportMarkdown) {
-      setIsLoadingReport(true);
-      getRehabReport(currentJobId)
-        .then(setReportMarkdown)
-        .catch(console.error)
-        .finally(() => setIsLoadingReport(false));
-    }
-  }, [job?.module2_status, currentJobId, reportMarkdown]);
+    if (!isLoadingReport || !currentJobId) return;
+    let cancelled = false;
+    getRehabReport(currentJobId)
+      .then((markdown) => {
+        if (!cancelled) setReport({ jobId: currentJobId, markdown });
+      })
+      .catch((err: unknown) => {
+        console.error(err);
+        if (!cancelled) setFailedJobId(currentJobId);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoadingReport, currentJobId]);
 
   const handleCopy = useCallback(async () => {
     if (reportMarkdown) {

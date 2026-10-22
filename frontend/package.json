@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/localizations": "^4.24.0",
+    "@clerk/react": "^6.18.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "lucide-react": "^0.577.0",

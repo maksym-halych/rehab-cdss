@@ -1,0 +1,32 @@
+# Install once: uv run --project api pre-commit install
+# Run on all files: uv run --project api pre-commit run --all-files
+# The lint hooks use the same tool versions as CI: ruff from api/uv.lock, ESLint from frontend/package-lock.json.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^frontend/tsconfig.*\.json$ # tsconfig allows comments
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --project api ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        files: ^(api/src|api/tests|scripts)/
+
+      - id: eslint
+        name: eslint
+        # ESLint runs in frontend/, so the hook strips the frontend/ prefix from the file paths
+        entry: bash -c 'cd frontend && npx --no-install eslint --max-warnings 0 "${@#frontend/}"' --
+        language: system
+        types_or: [ts, tsx, javascript]
+        files: ^frontend/

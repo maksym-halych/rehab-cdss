@@ -25,10 +25,10 @@ from dotenv import load_dotenv
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent.parent
 
-sys.path.insert(0, str(_PROJECT_ROOT / "src"))
+sys.path.insert(0, str(_PROJECT_ROOT / "api" / "src"))
 sys.path.insert(0, str(_PROJECT_ROOT / "scripts" / "ingest"))
 
-load_dotenv(_PROJECT_ROOT / ".env", override=True)
+load_dotenv(_PROJECT_ROOT / "api" / ".env", override=True)
 
 from langchain_openai import ChatOpenAI  # noqa: E402
 from module_2_reasoning.graph import build_pipeline  # noqa: E402

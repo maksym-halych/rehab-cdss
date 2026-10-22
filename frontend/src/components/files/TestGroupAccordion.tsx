@@ -5,7 +5,7 @@ import { UnknownFileRow } from './UnknownFileRow';
 import type { VariantFamily } from '../../api/types';
 import styles from './TestGroupAccordion.module.css';
 
-export const GROUP_LABELS: Record<string, string> = {
+const GROUP_LABELS: Record<string, string> = {
   dental: 'Стоматологія',
   postural: 'Постуральний аналіз',
   baropodometry: 'Баропідометрія (статична)',

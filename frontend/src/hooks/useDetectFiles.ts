@@ -99,6 +99,7 @@ export function useDetectFiles(files: UploadedFile[], personName: string): UseDe
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // detectedPeople intentionally omitted: used for skip-check only; including would re-run on every detection complete
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files, personName]);
 
   return { detectedPeople, fileGroups, fileAssignments, isLoading, error };

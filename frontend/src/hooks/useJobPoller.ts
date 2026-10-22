@@ -7,31 +7,25 @@ interface UseJobPollerResult {
   isPolling: boolean;
 }
 
+function isTerminal(job: Job): boolean {
+  const m2Done = job.module2_status === 'completed' || job.module2_status === 'failed';
+  return job.status === 'failed' || (job.status === 'completed' && m2Done);
+}
+
 export function useJobPoller(jobId: string | null): UseJobPollerResult {
-  const [job, setJob] = useState<Job | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
+  // Keyed by job id, so a stale job is never returned after jobId changes
+  const [polled, setPolled] = useState<{ jobId: string; job: Job } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!jobId) {
-      setJob(null);
-      setIsPolling(false);
-      return;
-    }
-
-    setIsPolling(true);
+    if (!jobId) return;
 
     const poll = async () => {
       try {
         const result = await getJob(jobId);
-        setJob(result);
-        const m2Done = result.module2_status === 'completed' || result.module2_status === 'failed';
-        const isTerminal =
-          result.status === 'failed' ||
-          (result.status === 'completed' && m2Done);
-        if (isTerminal) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          setIsPolling(false);
+        setPolled({ jobId, job: result });
+        if (isTerminal(result) && intervalRef.current) {
+          clearInterval(intervalRef.current);
         }
       } catch {
         // keep polling on transient errors
@@ -46,5 +40,7 @@ export function useJobPoller(jobId: string | null): UseJobPollerResult {
     };
   }, [jobId]);
 
+  const job = polled && polled.jobId === jobId ? polled.job : null;
+  const isPolling = jobId !== null && !(job && isTerminal(job));
   return { job, isPolling };
 }

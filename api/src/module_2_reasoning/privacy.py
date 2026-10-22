@@ -68,6 +68,7 @@ _IDENTITY_KEYS = {
     "mrn",
     "recordid",
     "externalid",
+    "externalreference",
     "birthdate",
     "dateofbirth",
     "dob",
@@ -123,7 +124,7 @@ _PATTERNS = tuple(
         r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b",
         r"(?<!\d)(?:19|20)\d{2}[-/.](?:0?[1-9]|1[0-2])[-/.](?:0?[1-9]|[12]\d|3[01])(?!\d)",
         r"(?<!\d)(?:0?[1-9]|[12]\d|3[01])[-/.](?:0?[1-9]|1[0-2])[-/.](?:19|20)\d{2}(?!\d)",
-        r"(?<!\w)\+?\d[\d ()-]{7,}\d(?!\w)",
+        r"(?<!\w)\+?\d(?:[ ()-]*\d){9,}(?!\w)",
         r"\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,})\b",
         r"\b(?:patient[_ ]?(?:id|code|name)|person[_ ]?(?:id|name)|local[_ ]?id|"
         r"full[_ ]?name|first[_ ]?name|last[_ ]?name|date[_ ]?of[_ ]?birth|birth[_ ]?date|"
@@ -170,17 +171,12 @@ class PrivacyGuard:
 
         for source in sources:
             collect(source)
-            info = source.get("patient_info", {}) if isinstance(source, dict) else {}
-            if isinstance(info, dict):
-                for key, value in info.items():
-                    if key not in {"age", "gender", "activity_level"}:
-                        tokens.update(
-                            _normalise(scalar).strip()
-                            for scalar in _scalars(value)
-                            if scalar.strip()
-                        )
         expressions = []
         for token in sorted(tokens, key=len, reverse=True):
+            # A short number alone is ambiguous with measurements and dosages.
+            # Identity fields stay excluded; labelled IDs are still scrubbed.
+            if token.isdigit() and len(token) < 5:
+                continue
             # Whitespace variants are common in copied names and clinical notes.
             expression = r"\s+".join(re.escape(part) for part in token.split())
             expressions.append(re.compile(r"(?<!\w)" + expression + r"(?!\w)", re.I))

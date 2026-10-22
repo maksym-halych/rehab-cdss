@@ -82,7 +82,14 @@ def invoke_structured(
     # Give the SDK a JSON schema, not a Pydantic class. Its automatic parsed-model
     # serialization can issue warnings containing the unsanitized response.
     # Validate locally, after removing identities from the returned JSON.
-    output_schema = schema.model_json_schema()
+    # Use the SDK's public strict-schema converter to preserve the previous
+    # Pydantic request format, including required fields and nullable defaults.
+    function = openai.pydantic_function_tool(schema)["function"]
+    output_schema = {
+        "name": function["name"],
+        "strict": True,
+        "schema": function["parameters"],
+    }
     structured_llm = llm.with_structured_output(output_schema)
 
     def _invoke() -> T:

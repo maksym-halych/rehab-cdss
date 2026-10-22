@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from module_2_reasoning.paths import DATA_DIR
+from module_2_reasoning.privacy import PrivacyError
 
 from ..models.jobs import Module2Status, MODULE2_STEPS
 from ..services.job_store import JobStore, _EXECUTOR
@@ -142,9 +143,13 @@ async def run_module2_async(
             module2_report_md_path=md_path,
             module2_report_docx_path=docx_path,
         )
-    except Exception:
+    except Exception as exc:
         await job_store.update(
             job_id,
             module2_status=Module2Status.FAILED,
-            module2_error="Module 2 failed. Check the input format and provider configuration.",
+            module2_error=(
+                str(exc)
+                if isinstance(exc, PrivacyError)
+                else "Module 2 failed. Check the input format and provider configuration."
+            ),
         )

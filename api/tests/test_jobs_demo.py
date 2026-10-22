@@ -158,8 +158,21 @@ def test_same_seed_gives_same_json(client):
 
 def test_unknown_scenario_is_rejected(client):
     assert client.get("/api/v1/demo/module1-json?scenario=unknown").status_code == 422
-def test_provider_error_is_not_returned_in_job_status(
-    client, synthetic_patient, monkeypatch, caplog, capsys
+
+
+@pytest.mark.parametrize(
+    "failure,expected_message",
+    [
+        ("provider", "The model request failed."),
+        ("measurement", "Clinical measurements must be finite numbers."),
+        (
+            "setup",
+            "Module 2 failed. Check the input format and provider configuration.",
+        ),
+    ],
+)
+def test_job_status_preserves_safe_errors_without_exposing_raw_details(
+    client, synthetic_patient, monkeypatch, caplog, capsys, failure, expected_message
 ):
     import langchain_openai
 
@@ -167,7 +180,22 @@ def test_provider_error_is_not_returned_in_job_status(
         def respond(self, schema, prompt):
             raise RuntimeError("PRIVATE_PATIENT_SENTINEL synthetic-provider-secret")
 
-    monkeypatch.setattr(langchain_openai, "ChatOpenAI", FailingLLM)
+    if failure == "provider":
+        monkeypatch.setattr(langchain_openai, "ChatOpenAI", FailingLLM)
+    elif failure == "measurement":
+        synthetic_patient["test_results"][0]["results"]["tables"][0]["rows"][0][
+            "left"
+        ] = "PRIVATE_PATIENT_SENTINEL"
+    else:
+        monkeypatch.setattr(
+            langchain_openai,
+            "ChatOpenAI",
+            Mock(
+                side_effect=RuntimeError(
+                    "PRIVATE_PATIENT_SENTINEL synthetic-provider-secret"
+                )
+            ),
+        )
     response = client.post(
         "/api/v1/jobs/from-json",
         files={
@@ -186,7 +214,7 @@ def test_provider_error_is_not_returned_in_job_status(
     output = status.text + caplog.text + capsys.readouterr().out
     assert "PRIVATE_PATIENT_SENTINEL" not in output
     assert "synthetic-provider-secret" not in output
-    assert status.json()["module2_error"]
+    assert status.json()["module2_error"] == expected_message
 
 
 def test_form_identity_overrides_do_not_lose_original_redaction_tokens(

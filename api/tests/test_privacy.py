@@ -6,12 +6,13 @@ from threading import Barrier
 from unittest.mock import Mock
 
 import httpx
+import openai
 from langchain_openai import ChatOpenAI
 from langsmith.run_helpers import get_tracing_context
 import pytest
 
 from fakes import IDENTITY, FakeLLM
-from module_2_reasoning import _retry, retrieval
+from module_2_reasoning import _retry, retrieval, schemas
 from module_2_reasoning.privacy import (
     PrivacyError,
     PrivacyGuard,
@@ -20,6 +21,7 @@ from module_2_reasoning.privacy import (
     privacy_scope,
 )
 from module_2_reasoning.schemas import ClinicalSummary
+from module_2_reasoning.summarizer import summarize
 
 
 def assert_no_identity(value):
@@ -61,11 +63,73 @@ def test_known_identity_is_removed_case_insensitively_and_after_unicode_normalis
     assert guard.text("Тестенко, Ірина: 30 kg") == f"{REMOVED}, {REMOVED}: 30 kg"
 
 
+@pytest.mark.parametrize("code", [7, "12", "1234", "１２"])
+def test_short_numeric_identity_preserves_summary_measurements_and_report(code):
+    guard = PrivacyGuard.from_patient({"patient_info": {"patient_code": code}})
+    clinical_text = "Phase 1: 3 x 12 reps; 0.7 kg; 1234 steps"
+    filtered = schemas.FilteredTestResult(
+        test_name="Strength",
+        flagged_params=[
+            schemas.FlaggedParameter(
+                parameter="Force",
+                left=12,
+                right=20,
+                unit="kg",
+                norm=[15, 25],
+                flag_reason="below_norm",
+            )
+        ],
+        interpretation_uk=clinical_text,
+        has_norm_data=True,
+    )
+
+    class ClinicalLLM(FakeLLM):
+        def respond(self, schema, prompt):
+            result = super().respond(schema, prompt)
+            result.full_patient_summary = clinical_text
+            return result
+
+    llm = ClinicalLLM()
+    with privacy_scope(guard):
+        result = summarize([filtered], {"age": 30, "gender": "male"}, llm)
+    prompt = llm.calls[0][1]
+    data = json.loads(
+        prompt.rsplit("<filtered_data>", 1)[1].split("</filtered_data>")[0]
+    )
+    assert data == [filtered.model_dump()]
+    assert result.full_patient_summary == clinical_text
+    assert guard.text(f"patient_code={code}; {clinical_text}") == (
+        f"{REMOVED}; {clinical_text}"
+    )
+
+
+def test_long_numeric_identity_is_still_removed():
+    guard = PrivacyGuard.from_patient({"patient_code": "12345"})
+    assert guard.text("Record 12345; 12 kg") == f"Record {REMOVED}; 12 kg"
+
+
+def test_unknown_patient_fields_do_not_become_identity_tokens(synthetic_patient):
+    info = synthetic_patient["patient_info"]
+    info.update(dominant_side="right", height=180, diagnosis="knee pain")
+    guard = PrivacyGuard.from_patient(synthetic_patient)
+    clinical = {"right": 20, "interpretation": "knee pain; ROM 180 deg"}
+    assert guard.clean(clinical) == clinical
+    exported = guard.patient_export(synthetic_patient, info)
+    assert set(exported["patient_info"]) == {"age", "gender", "activity_level"}
+
+
+@pytest.mark.parametrize("text", ["ROM 100 - 120 - 140 deg", "sets 10-15-20-25"])
+def test_clinical_ranges_are_not_mistaken_for_phone_numbers(text):
+    assert PrivacyGuard().text(text) == text
+
+
 @pytest.mark.parametrize(
     "text",
     [
         "new.person@example.org",
         "+380501234567",
+        "+380 (50) 123-45-67",
+        "050 123 45 67",
         "2001-05-06",
         "06/05/2001",
         "f47ac10b-58cc-4372-a567-0e02b2c3d479",
@@ -157,6 +221,46 @@ def _response(content):
     )
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        schemas.ClinicalSummary,
+        schemas.ProtocolQueryList,
+        schemas.GraderOutput,
+        schemas.RewrittenQueries,
+        schemas.DraftTreatmentPlan,
+        schemas.EnglishRehabilitationReport,
+        schemas.RehabilitationReport,
+    ],
+)
+def test_guarded_requests_preserve_the_original_strict_response_format(schema):
+    payloads = []
+    response = FakeLLM().respond(schema, "").model_dump()
+
+    def transport(request):
+        payloads.append(json.loads(request.content))
+        if len(payloads) == 1:
+            # Capture the old request without invoking its unsafe response parser.
+            return httpx.Response(400, json={"error": {"message": "Synthetic stop"}})
+        return _response(response)
+
+    with httpx.Client(transport=httpx.MockTransport(transport)) as http:
+        llm = ChatOpenAI(
+            model="gpt-4.1-mini",
+            api_key="synthetic-key",
+            max_retries=0,
+            http_client=http,
+        )
+        with pytest.raises(openai.BadRequestError):
+            llm.with_structured_output(schema).invoke("Synthetic clinical data")
+        with privacy_scope(PrivacyGuard()):
+            result = _retry.invoke_structured(llm, schema, "Synthetic clinical data")
+    assert result.model_dump() == response
+    assert len(payloads) == 2
+    assert payloads[1]["response_format"] == payloads[0]["response_format"]
+    assert payloads[1]["response_format"]["json_schema"]["strict"] is True
+
+
 @pytest.mark.parametrize("status_code", [429, 500])
 def test_actual_http_payloads_are_clean_on_retry_and_fallback(
     monkeypatch,
@@ -212,6 +316,8 @@ def test_actual_http_payloads_are_clean_on_retry_and_fallback(
                 fallback if status_code == 429 else None,
             )
     assert calls == 2
+    assert payloads[0]["response_format"] == payloads[1]["response_format"]
+    assert payloads[0]["response_format"]["json_schema"]["strict"] is True
     assert tracing == [False, False]
     assert_no_identity(payloads)
     assert_no_identity(result.model_dump())

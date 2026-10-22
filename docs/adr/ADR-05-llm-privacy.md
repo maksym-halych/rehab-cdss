@@ -31,11 +31,18 @@ patient identity in local export metadata so old names repeated in notes are
 still removed. Caller-supplied graph state, callbacks, run names and metadata
 are not forwarded. Only `recursion_limit` is accepted from invocation config.
 
-The guard removes known identity values and name components after Unicode
-normalization, case-insensitive matching and whitespace normalization. Additional
+The guard collects tokens only from explicitly recognized identity keys, including
+external references, and removes their values and name components after Unicode
+normalization, case-insensitive matching and whitespace normalization.
+Other patient fields do not become redaction tokens; the allowlist keeps them local.
+Bare numeric tokens shorter than five digits are excluded to preserve measurements
+and exercise dosages. Their identity fields are still omitted and explicitly
+labelled values such as `patient_code=12` are still removed. Additional
 patterns remove email addresses, phone numbers, calendar dates, UUIDs, URLs,
 common secret formats and explicitly labelled identity fields in text. It copies
-input rather than modifying the local source. Its representation hides tokens.
+input rather than modifying the local source. Generic phone matching requires at
+least ten digits, so short clinical ranges are retained. Known contact values and
+explicit phone labels remain covered. Its representation hides tokens.
 
 Every patient-related chat call uses `invoke_structured`: summary, query
 generation, grading, rewriting, reasoning, report generation and translation.
@@ -43,6 +50,8 @@ The same guard runs before primary, retry and fallback calls. Responses are
 scrubbed before local Pydantic validation and reuse in later nodes. The SDK gets
 a JSON schema rather than a Pydantic class, so its parsed-model serialization
 cannot print a warning containing the raw model response.
+The SDK's public strict-schema converter preserves the previous Pydantic request
+format, including required fields, nullable fields and `additionalProperties`.
 
 Protocol and exercise searches also require the active guard and scrub query
 text before Chroma calls the external embedding provider. Identity context uses
@@ -54,6 +63,8 @@ environment. LangChain debug/verbose mode, model callbacks and provider debug
 logging fail closed. Application progress output contains only static step names
 and counts. It does not print patient objects, file paths, generated queries,
 grader feedback or provider exception bodies. API/CLI errors use static messages.
+Job status preserves specific safe `PrivacyError` messages; unexpected failures
+receive a generic message without the original exception details.
 
 The separate `scripts/ingest/` tools process reviewed public rehabilitation
 protocols and exercises, not patient exports. They are not patient upload entry
@@ -72,9 +83,12 @@ real patient use. Do not treat a successful request as proof of anonymity.
 The current tests and demos use synthetic inputs only.
 
 Exact age and rare clinical combinations can still allow indirect identification.
-Rules can also remove legitimate clinical text when it matches an identity or a
-date/phone pattern. Numeric measurements and norms stay unchanged. QA must check
-that retained clinical meaning is adequate before use with a new input format.
+Numeric fields are preserved during structured export, but the serialized prompt
+and model output also pass through text redaction. Longer numeric identities and
+date/phone patterns can still collide with clinical text. Short bare numeric IDs
+are not distinguishable from clinical values and must not appear unlabelled in
+notes. QA must check that retained clinical meaning is adequate before use with
+a new input format.
 The application must not silently substitute omitted measurements or conclusions.
 
 Raw JSON remains in local job storage and its existing download endpoint. This
@@ -94,7 +108,10 @@ uv run --locked pytest -W error --cov --cov-fail-under=60 --cov-report=term-miss
 `test_privacy.py` intercepts actual `ChatOpenAI` JSON requests using an in-memory
 HTTP transport, including a retry and a fallback. It checks synthetic names,
 dates, local IDs, contacts, tracing, malformed data, embedding queries, provider
-errors and thread isolation. No network request reaches a provider.
+errors and thread isolation. Regression tests check numeric codes, summary
+measurements, clinical ranges and strict request-format parity for all seven
+output schemas. No network request reaches a provider. A live synthetic Gemini
+smoke test on dev remains a separate deployment check.
 
 `test_privacy_pipeline.py` runs the graph with deterministic model responses,
 including rejection/rewrite and translation, and checks prompts, outputs and CLI

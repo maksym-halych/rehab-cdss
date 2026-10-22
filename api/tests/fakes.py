@@ -41,7 +41,7 @@ class FakeLLM:
 
     def with_structured_output(self, schema):
         if isinstance(schema, dict):
-            schema = getattr(schemas, schema["title"])
+            schema = getattr(schemas, schema["name"])
         return SimpleNamespace(invoke=lambda prompt: self.respond(schema, prompt))
 
     def respond(self, schema, prompt):
